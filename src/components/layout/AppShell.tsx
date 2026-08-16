@@ -16,7 +16,13 @@ export function AppShell() {
   useFilterUrlSync();
 
   return (
-    <div className="flex h-screen overflow-hidden bg-page">
+    // `relative` is load-bearing, not cosmetic. `sr-only` is `position:
+    // absolute`, and with no positioned ancestor those nodes resolve against the
+    // initial containing block — so `overflow-hidden` here does not clip them
+    // and each one extends the *document*'s scroll height to wherever it sits.
+    // On the explorer that is a ranked-table `<caption>` ~1800px down, which
+    // gave the window a scrollbar and scrolled the rail off the top with it.
+    <div className="relative flex h-screen overflow-hidden bg-page">
       {/*
         The navigation rail is five links deep and sits before the content in
         the DOM, so without this every keyboard and screen-reader user tabs
@@ -41,7 +47,11 @@ export function AppShell() {
           // a non-focusable element scrolls the page but leaves focus where it
           // was, and the next Tab goes straight back into the navigation.
           tabIndex={-1}
-          className="flex-1 overflow-y-auto focus:outline-none"
+          // `relative` for the same reason as the shell root above, one level
+          // tighter: it makes the scroll container the containing block, so a
+          // page's `sr-only` nodes scroll with their own content instead of
+          // being clipped against the shell at a stale offset.
+          className="relative flex-1 overflow-y-auto focus:outline-none"
         >
           <Outlet />
         </main>
