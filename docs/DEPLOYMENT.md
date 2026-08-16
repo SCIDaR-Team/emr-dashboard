@@ -105,15 +105,35 @@ the deploy preview:
 
 ## Known advisories
 
-`npm audit` reports three moderate issues against production dependencies as of
-this commit. Neither is a deploy blocker; both are recorded here so the choice
-is deliberate rather than forgotten:
+`npm audit` reports one moderate issue against production dependencies as of
+this commit. It is not a deploy blocker; it is recorded here so the choice is
+deliberate rather than forgotten:
 
-- **`react-router` / `react-router-dom` 6.26.2** — open redirect via backslash
-  in `<Link>`/`useNavigate`, plus an SSR-hydration issue that does not apply to
-  a static SPA. A non-breaking `npm audit fix` is available.
 - **`echarts` <6.1.0** — XSS. The fix is a major version bump. The charts
   render ETL-generated data, not user input.
+
+**Resolved:** the `react-router` advisories (open redirect via backslash in
+`<Link>`/`useNavigate`, GHSA-wrjc-x8rr-h8h6; plus an SSR-hydration issue that
+never applied to a static SPA) by upgrading to `react-router-dom` 7.18.2.
+
+Do not trust `npm audit`'s remediation advice on this one if it resurfaces. It
+reports *fix available via `npm audit fix`*, implying a patch inside the 6.x
+line; running it is a no-op that prints "up to date" while leaving the finding
+in place. The advisory range is `6.0.0 - 7.17.0` and 6.30.4 was the final 6.x
+release, so no patched 6.x exists — the only fixed version is 7.18.0 or later,
+which is a major upgrade.
+
+The upgrade was behaviour-neutral here because the app uses only the
+declarative router core — `BrowserRouter`, `Routes`/`Route`, `Outlet`, `Link`,
+`NavLink`, `Navigate`, `useNavigate`, `useParams`, `useSearchParams`,
+`useLocation`. There are no data-router APIs (`createBrowserRouter`, loaders,
+actions, `Form`, `useRouteError`), which is where a v6→v7 migration usually
+costs something. The one v7 default that changes matching semantics,
+`v7_relativeSplatPath`, is inert here: the only splat route is `path="*"` and
+its target is the absolute `/`.
+
+Note that react-router 7 declares `engines.node >= 20`, so the `NODE_VERSION`
+pin in `netlify.toml` is now a hard floor rather than a preference.
 
 Deliberately not configured: a `Content-Security-Policy`. The PDF and image
 export path (`jspdf`, `html2canvas`) and ECharts rely on inline styles, so a

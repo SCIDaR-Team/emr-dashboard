@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "EMR Readiness Assessment Dashboard \u2014 NPHCDA",
+  "description": "EMR Readiness Assessment Dashboard — NPHCDA",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -27,7 +27,7 @@
     "papaparse": "^5.4.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.26.2",
+    "react-router-dom": "^7.18.2",
     "tailwind-merge": "^2.5.2",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zustand": "^4.5.5"
