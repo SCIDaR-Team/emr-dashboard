@@ -1,0 +1,194 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Design tokens.
+ *
+ * Values are HSL channel triples (no hsl() wrapper) so Tailwind can apply
+ * opacity modifiers — see the <alpha-value> placeholders in tailwind.config.js.
+ *
+ * The palette is taken from the ERA Figma prototype: a deep forest green brand
+ * with a three-colour readiness scale (green / amber / red). Those three are
+ * load-bearing — they encode Ready / Moderately ready / Not ready everywhere in
+ * the app — so they are defined once here and reached only via
+ * statusColor() in src/lib/bands.ts.
+ */
+
+@layer base {
+  :root {
+    --page: 150 14% 97%;
+    --surface: 0 0% 100%;
+    --foreground: 158 44% 12%;
+    --muted: 150 12% 94%;
+    --muted-foreground: 155 8% 42%;
+    --border: 150 12% 89%;
+    --input: 150 12% 89%;
+    --ring: 152 41% 30%;
+
+    /*
+     * The brand ramp is defined by role, not by lightness, because dark mode
+     * cannot simply invert it:
+     *   50 / 100  subtle washes behind content
+     *   500       primary accent — borders, active states, filled controls
+     *   600       stronger accent, hover
+     *   700       heading text
+     *   900       strongest text
+     * In dark mode the washes stay dark while 500–900 get *lighter*, so a token
+     * keeps its role rather than its hue position. Pair a filled 500 with
+     * `text-surface`, never `text-white` — surface follows the scheme, white
+     * does not, and on dark-mode 500 white leaves a 3:1 glyph.
+     */
+    --brand-50: 145 45% 94%;
+    --brand-100: 145 40% 87%;
+    --brand-500: 152 41% 30%;
+    --brand-600: 154 45% 24%;
+    --brand-700: 156 50% 19%;
+    --brand-900: 158 44% 12%;
+
+    /*
+     * The sidebar is a fixed dark-green rail in both schemes — that is the
+     * Figma's design, and it is the one surface that must not follow the
+     * scheme. It has its own tokens because it previously borrowed
+     * `--brand-900`, which dark mode redefines as near-white text; the rail then
+     * rendered white-on-white and the navigation vanished.
+     */
+    --sidebar: 158 44% 12%;
+    --sidebar-foreground: 0 0% 100%;
+
+    --ready: 152 45% 28%;
+    --ready-wash: 145 45% 94%;
+    --moderate: 45 92% 53%;
+    --moderate-wash: 48 90% 95%;
+    --not-ready: 356 75% 57%;
+    --not-ready-wash: 355 80% 96%;
+    --no-data: 150 8% 85%;
+
+    /*
+     * Administrative boundaries on the maps. Near-solid on purpose: these used
+     * to be drawn as `--foreground` at 30% alpha, which read as a grey wisp
+     * over the readiness fills and vanished entirely over satellite imagery.
+     * Bolder here means higher contrast at the same stroke width — the lines
+     * must not get thicker, or an LGA border starts competing with its own
+     * fill for area on screen.
+     */
+    --map-boundary: 158 50% 10%;
+
+    --radius: 0.5rem;
+    --radius-card: 1rem;
+  }
+
+  .dark {
+    --page: 158 30% 8%;
+    --surface: 158 28% 12%;
+    --foreground: 150 20% 96%;
+    --muted: 158 20% 18%;
+    --muted-foreground: 150 10% 65%;
+    --border: 158 20% 20%;
+    --input: 158 20% 20%;
+    --ring: 152 45% 45%;
+
+    --brand-50: 158 28% 16%;
+    --brand-100: 158 26% 22%;
+    --brand-500: 152 42% 52%;
+    --brand-600: 152 45% 62%;
+    --brand-700: 150 40% 74%;
+    --brand-900: 150 20% 96%;
+
+    --sidebar: 158 34% 10%;
+    --sidebar-foreground: 150 20% 96%;
+
+    --ready: 152 44% 45%;
+    --ready-wash: 152 30% 18%;
+    --moderate: 45 85% 58%;
+    --moderate-wash: 45 30% 18%;
+    --not-ready: 356 70% 62%;
+    --not-ready-wash: 356 30% 19%;
+    --no-data: 158 14% 26%;
+
+    /* Light, not white: full white at this contrast haloes against the dark
+       fills. Same role, same width, inverted for the scheme. */
+    --map-boundary: 150 25% 92%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    @apply bg-page text-foreground font-sans;
+  }
+
+  /* Respect the OS setting for anyone who has asked for reduced motion. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-surface rounded-card shadow-card border border-border;
+  }
+
+  /* Secondary-evidence fill for the 25 desk-review states on the choropleth.
+     Colour alone would imply the same evidential grade as an assessed state.
+     Note the 45° angle: it is the *evidence* axis, and the readiness stripes
+     below deliberately run the other way at 135° so the two never read as the
+     same mark. Lines mean evidence grade; dots mean readiness band. */
+  .hatch-secondary {
+    background-image: repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 4px,
+      hsl(var(--muted-foreground) / 0.25) 4px,
+      hsl(var(--muted-foreground) / 0.25) 6px
+    );
+  }
+
+  /*
+   * Readiness textures — the non-colour carrier for HTML area fills.
+   * `BAND_TEXTURE` in src/lib/bands.ts is the source of truth for which band
+   * gets which; `components/map/BandPattern.tsx` is the SVG counterpart, the
+   * way MapHatch is the SVG counterpart to .hatch-secondary above.
+   *
+   * Marks are a fixed dark ink rather than --foreground. The band colours do
+   * not follow the colour scheme — amber is the same amber in dark mode — so a
+   * mark taken from --foreground flips to near-white against a background that
+   * did not change, and a texture that reads in light mode all but disappears.
+   * Only the two mid-toned bands are textured (Ready is solid), so one ink
+   * works on both in both schemes. BandPattern.tsx and bandDecal() in
+   * chartTheme.ts make the same choice for the same reason.
+   *
+   * Scaled small enough to survive inside a 6px distribution bar, which is the
+   * tightest place any of these has to work.
+   */
+  .band-texture-ready {
+    /* Intentionally empty. Ready is the solid one — see bands.ts. */
+  }
+
+  .band-texture-moderate {
+    background-image: radial-gradient(rgb(0 0 0 / 0.36) 0.9px, transparent 1px);
+    background-size: 4px 4px;
+  }
+
+  .band-texture-notready {
+    background-image: repeating-linear-gradient(
+      135deg,
+      transparent 0 2px,
+      rgb(0 0 0 / 0.3) 2px 3.5px
+    );
+  }
+}
