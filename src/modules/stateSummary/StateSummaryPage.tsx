@@ -128,15 +128,19 @@ export default function StateSummaryPage() {
         title="State Summary"
         subtitle={`Readiness across ${COVERAGE.statesTotal} states using state-level findings`}
       >
-        <FilterBar facilities={facilitiesFetch.data} show={['state']} />
-        <MultiSelectDropdown
-          label="Readiness"
-          className="w-48"
-          groups={[{ label: 'Among the 12 states with facility-level findings', items: readinessOptions }]}
-          selected={bandFilter}
-          onChange={(next) => setBandFilter(next as Band[])}
-          placeholder="All readiness levels"
-        />
+        {/* Readiness is passed through FilterBar's slot rather than rendered
+            beside it: FilterBar owns the row, so a sibling control lands on a
+            second line under the State dropdown. */}
+        <FilterBar facilities={facilitiesFetch.data} show={['state']}>
+          <MultiSelectDropdown
+            label="Readiness"
+            className="min-w-[9.5rem] flex-1 sm:w-48 sm:flex-none"
+            groups={[{ label: 'Among the 12 states with facility-level findings', items: readinessOptions }]}
+            selected={bandFilter}
+            onChange={(next) => setBandFilter(next as Band[])}
+            placeholder="All readiness levels"
+          />
+        </FilterBar>
       </PageHeader>
 
       <div className="space-y-5 px-4 pb-8 sm:px-6 lg:space-y-6 lg:px-8">
@@ -147,7 +151,11 @@ export default function StateSummaryPage() {
         {isLoading && !scope ? (
           <PageSkeleton />
         ) : (
-          <div className="grid gap-5 lg:gap-6 xl:grid-cols-2">
+          // One column, not two: the map is the page's primary object and a
+          // half-width card left it 500px wide with the domain scores squeezed
+          // into 90px columns. Full width gives the map room and lets the score
+          // strip beneath it actually run horizontally.
+          <div className="space-y-5 lg:space-y-6">
             <SectionCard
               title="Readiness by state"
               subtitle={`Among the ${COVERAGE.statesPrimary} states with facility-level findings`}
@@ -173,8 +181,15 @@ export default function StateSummaryPage() {
                 facility-level readiness to classify. Shown on the map below, not counted above.
               </p>
 
-              <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_16rem]">
-                <div className="space-y-3">
+              {/* Map first, at the card's full width, with the scores as a
+                  horizontal strip beneath it — the 16rem column beside the map
+                  was taking a third of the width off the one element on this
+                  page that is read by shape rather than by number. */}
+              <div className="space-y-4">
+                {/* Capped and centred: the map keeps a fixed 1000:813 aspect,
+                    so letting it fill a full-width card would make it ~1000px
+                    tall and push everything else off the fold. */}
+                <div className="mx-auto w-full max-w-3xl space-y-3">
                   <NigeriaChoropleth
                     data={polygonData}
                     selectedId={visiblePrimaryStates.length === 1 ? (visiblePrimaryStates[0]?.id ?? null) : null}
@@ -183,38 +198,49 @@ export default function StateSummaryPage() {
                 </div>
 
                 <div className="rounded-lg border border-border p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    {scopeLabel} average score
-                  </p>
-                  <p className="mt-1 text-2xl font-bold text-brand-700">
-                    {formatScore(scope?.averageScore ?? null)}
-                    <span className="text-sm font-medium text-muted-foreground">/5</span>
-                  </p>
-                  <MaturityBadge score={scope?.averageScore ?? null} size="sm" className="mt-1.5" />
+                  {/* Stacked on a phone, side by side from `sm`: the maturity
+                      pills ("Institutionalized") don't shrink, so the domain
+                      columns can't go below ~140px without overflowing — hence
+                      the column count climbing with the width rather than
+                      sitting at five. */}
+                  <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-start sm:gap-x-6">
+                    <div className="shrink-0">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        {scopeLabel} average score
+                      </p>
+                      <div className="mt-1 flex items-center gap-2.5">
+                        <p className="text-2xl font-bold text-brand-700">
+                          {formatScore(scope?.averageScore ?? null)}
+                          <span className="text-sm font-medium text-muted-foreground">/5</span>
+                        </p>
+                        <MaturityBadge score={scope?.averageScore ?? null} size="sm" />
+                      </div>
+                    </div>
 
-                  <p className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Domain scores
-                  </p>
-                  <ul className="space-y-2.5">
-                    {THEMES.map((theme) => {
-                      const score = scope?.themeScores[theme.id] ?? null;
-                      return (
-                        <li key={theme.id} className="flex items-center justify-between gap-2">
-                          <span className="text-sm text-foreground">{theme.shortLabel}</span>
-                          <span className="flex items-center gap-2">
-                            <span className="text-sm font-semibold tabular-nums text-brand-700">
-                              {formatScore(score)}
-                            </span>
-                            <MaturityBadge score={score} size="sm" />
-                          </span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                  <p className="mt-3 text-xs text-muted-foreground">
-                    Leadership & Governance covers only 4 of the rubric's 14 questions, for the
-                    12 primary states (guide §17.1). Secondary states show no data throughout.
-                  </p>
+                    <div className="hidden self-stretch border-l border-border sm:block" />
+
+                    <div className="min-w-0 flex-1">
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Domain scores
+                      </p>
+                      <ul className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+                        {THEMES.map((theme) => {
+                          const score = scope?.themeScores[theme.id] ?? null;
+                          return (
+                            <li key={theme.id} className="min-w-0">
+                              <p className="truncate text-xs text-muted-foreground" title={theme.label}>
+                                {theme.shortLabel}
+                              </p>
+                              <p className="mt-0.5 text-lg font-semibold tabular-nums text-brand-700">
+                                {formatScore(score)}
+                              </p>
+                              <MaturityBadge score={score} size="sm" className="mt-1" />
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  </div>
                 </div>
               </div>
             </SectionCard>
@@ -231,46 +257,52 @@ export default function StateSummaryPage() {
             >
               {scope?.investments.length ? (
                 <>
-                  <div className="mb-5 space-y-3">
-                    {THEMES.filter((t) => t.facilityLevel).map((theme) => {
-                      const items = scope.investments.filter((i) => i.themeId === theme.id);
-                      const quantity = items.reduce((sum, i) => sum + i.quantity, 0);
-                      const max = Math.max(
-                        1,
-                        ...THEMES.filter((t) => t.facilityLevel).map((t) =>
-                          scope.investments
-                            .filter((i) => i.themeId === t.id)
-                            .reduce((sum, i) => sum + i.quantity, 0),
-                        ),
-                      );
-                      return (
-                        <div key={theme.id}>
-                          <div className="mb-1 flex items-center justify-between text-sm">
-                            <span className="text-foreground">{theme.label}</span>
-                            <span className="font-semibold text-brand-700">
-                              {formatCount(quantity)} items
-                            </span>
+                  {/* Bars and the total sit side by side now that the card is
+                      full width — stacked, four bars stretched to 1200px read
+                      as a chart with nothing to compare against. */}
+                  <div className="mb-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
+                    <div className="space-y-3">
+                      {THEMES.filter((t) => t.facilityLevel).map((theme) => {
+                        const items = scope.investments.filter((i) => i.themeId === theme.id);
+                        const quantity = items.reduce((sum, i) => sum + i.quantity, 0);
+                        const max = Math.max(
+                          1,
+                          ...THEMES.filter((t) => t.facilityLevel).map((t) =>
+                            scope.investments
+                              .filter((i) => i.themeId === t.id)
+                              .reduce((sum, i) => sum + i.quantity, 0),
+                          ),
+                        );
+                        return (
+                          <div key={theme.id}>
+                            <div className="mb-1 flex items-center justify-between text-sm">
+                              <span className="text-foreground">{theme.label}</span>
+                              <span className="font-semibold text-brand-700">
+                                {formatCount(quantity)} items
+                              </span>
+                            </div>
+                            <div className="h-2 rounded-full bg-muted">
+                              <div
+                                className="h-2 rounded-full bg-brand-600"
+                                style={{ width: `${(quantity / max) * 100}%` }}
+                              />
+                            </div>
                           </div>
-                          <div className="h-2 rounded-full bg-muted">
-                            <div
-                              className="h-2 rounded-full bg-brand-600"
-                              style={{ width: `${(quantity / max) * 100}%` }}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div className="mb-5 rounded-lg border border-border p-4">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      Total investment items
-                    </p>
-                    <p className="mt-1 text-2xl font-bold text-brand-700">
-                      {formatCount(scope.investments.reduce((sum, i) => sum + i.quantity, 0))}
-                    </p>
-                    <p className="text-xs italic text-muted-foreground">
-                      Naira total pending a signed-off cost table (guide §9.1, §17.4)
-                    </p>
+                        );
+                      })}
+                    </div>
+
+                    <div className="rounded-lg border border-border p-4">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Total investment items
+                      </p>
+                      <p className="mt-1 text-2xl font-bold text-brand-700">
+                        {formatCount(scope.investments.reduce((sum, i) => sum + i.quantity, 0))}
+                      </p>
+                      <p className="text-xs italic text-muted-foreground">
+                        Naira total pending a signed-off cost table (guide §9.1, §17.4)
+                      </p>
+                    </div>
                   </div>
                   <InvestmentTable items={scope.investments} />
                 </>
@@ -289,7 +321,7 @@ export default function StateSummaryPage() {
               )}
             </SectionCard>
 
-            <Card className="xl:col-span-2">
+            <Card>
               <h2 className="text-base font-semibold text-brand-700">Roadmap (6 month plan)</h2>
               <p className="mt-1 text-sm text-muted-foreground">
                 Activity per month, by readiness archetype
