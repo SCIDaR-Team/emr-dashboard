@@ -1,5 +1,5 @@
 import { Check, CircleSlash, Minus } from 'lucide-react';
-import { BAND_CLASSES, BAND_LABEL } from '@/lib/bands';
+import { BAND_CLASSES, BAND_LABEL, toBand, toMaturityLevel } from '@/lib/bands';
 import { cn } from '@/lib/cn';
 import type { Band } from '@/lib/types';
 
@@ -88,6 +88,70 @@ export function BandBadge({
     >
       {showIcon && <Icon className={size === 'sm' ? 'h-3 w-3' : 'h-3.5 w-3.5'} aria-hidden />}
       {BAND_LABEL[band]}
+    </span>
+  );
+}
+
+const MATURITY_LABEL: Record<string, string> = {
+  nascent: 'Nascent',
+  emerging: 'Emerging',
+  developing: 'Developing',
+  institutionalized: 'Institutionalized',
+  optimized: 'Optimized',
+};
+
+interface MaturityBadgeProps {
+  score: number | null;
+  size?: 'sm' | 'md';
+  className?: string;
+}
+
+/**
+ * The five-band maturity label (Nascent → Optimized) for one domain score.
+ *
+ * The Figma's Facility Scorecard and State Summary screens label each domain
+ * donut this way, while the overall facility/state badge stays on the
+ * three-band scale (`BandBadge`) — replicated deliberately: the two screens
+ * use both scales at once, one per level of aggregation, and the build guide
+ * had recommended dropping the five-band label everywhere. The client's
+ * direction is to keep it exactly where the Figma shows it.
+ *
+ * Coloured by the same three-band mapping as everything else (`toBand`),
+ * not a fifth palette — the Figma's own mock colours don't consistently
+ * track its five-band labels (e.g. two different "Developing" domains are
+ * shown in two different colours), which the build guide already flagged as
+ * illustrative/inconsistent mock data, not a scheme to reproduce literally.
+ */
+export function MaturityBadge({ score, size = 'md', className }: MaturityBadgeProps) {
+  const level = toMaturityLevel(score);
+  if (!level) {
+    return (
+      <span
+        className={cn(
+          'inline-flex items-center rounded-full bg-muted font-medium text-muted-foreground',
+          size === 'sm' ? 'px-2 py-0.5 text-xs' : 'px-3 py-1 text-sm',
+          className,
+        )}
+      >
+        No data
+      </span>
+    );
+  }
+
+  const band = toBand(score) as Band;
+  const classes = BAND_CLASSES[band];
+
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center rounded-full font-medium',
+        classes.wash,
+        classes.text,
+        size === 'sm' ? 'px-2 py-0.5 text-xs' : 'px-3 py-1 text-sm',
+        className,
+      )}
+    >
+      {MATURITY_LABEL[level]}
     </span>
   );
 }

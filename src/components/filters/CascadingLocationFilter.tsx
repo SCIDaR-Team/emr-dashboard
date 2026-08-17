@@ -64,7 +64,7 @@ export function CascadingLocationFilter({
         .map((f) => ({
           value: f.uuid,
           label: f.name,
-          hint: `${f.lga}, ${f.state} · ${BAND_LABEL[f.archetype]}`,
+          hint: `${f.lga}, ${f.state} · ${f.archetype ? BAND_LABEL[f.archetype] : 'No data'}`,
         })),
     };
   }, [facilities, states, lgas]);

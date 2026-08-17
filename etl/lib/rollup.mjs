@@ -8,6 +8,7 @@
  */
 
 import { bandDistribution, compositeReadiness, meanOrNull, toBand } from './scoring.mjs';
+import { rollUpInvestments } from './investment.mjs';
 
 const ALL_STATES = [
   'Abia', 'Adamawa', 'Akwa Ibom', 'Anambra', 'Bauchi', 'Bayelsa', 'Benue',
@@ -45,16 +46,18 @@ function aggregateSubThemes(facilities) {
   );
 }
 
-function aggregate({ id, level, name, parentId, facilities }) {
+function aggregate({ id, level, name, parentId, facilities, leadershipScore }) {
   const archetypes = facilities.map((f) => f.archetype).filter(Boolean);
   const themeScores = Object.fromEntries(
     THEME_IDS.map((themeId) => [
       themeId,
-      meanOrNull(
-        facilities.map(
-          (f) => f.themeScores.find((t) => t.themeId === themeId)?.score ?? null,
-        ),
-      ),
+      themeId === 'leadership_governance'
+        ? leadershipScore ?? null
+        : meanOrNull(
+            facilities.map(
+              (f) => f.themeScores.find((t) => t.themeId === themeId)?.score ?? null,
+            ),
+          ),
     ]),
   );
   const averageScore = meanOrNull(facilities.map((f) => f.averageDomainScore));
@@ -72,7 +75,7 @@ function aggregate({ id, level, name, parentId, facilities }) {
     compositeReadiness: compositeReadiness(archetypes),
     averageScore,
     band: toBand(averageScore),
-    investments: [],
+    investments: level === 'lga' ? [] : rollUpInvestments(facilities),
     roadmap: [],
   };
 }
@@ -87,7 +90,15 @@ function groupBy(items, key) {
   return map;
 }
 
-export function rollUp(facilities) {
+/**
+ * @param facilities
+ * @param leadershipByState  state name (as in the facility rows, e.g.
+ *   "Akwa Ibom") -> { score, indicators } from stateLeadership.mjs. Covers
+ *   the 12 primary states only — see that reader's own caveats about partial
+ *   (4 of 14 rubric questions) coverage. Optional; omitted states/national
+ *   simply carry `leadership_governance: null`, same as before this existed.
+ */
+export function rollUp(facilities, leadershipByState = new Map()) {
   const byState = groupBy(facilities, 'stateId');
 
   const lgas = [];
@@ -108,13 +119,15 @@ export function rollUp(facilities) {
   const assessed = new Set();
   const states = [];
   for (const [stateId, stateFacilities] of byState) {
-    assessed.add(stateFacilities[0].state);
+    const stateName = stateFacilities[0].state;
+    assessed.add(stateName);
     const profile = aggregate({
       id: stateId,
       level: 'state',
-      name: stateFacilities[0].state,
+      name: stateName,
       parentId: null,
       facilities: stateFacilities,
+      leadershipScore: leadershipByState.get(stateName)?.score ?? null,
     });
     profile.lgaCount = new Set(stateFacilities.map((f) => f.lgaId)).size;
     states.push(profile);
@@ -143,12 +156,20 @@ export function rollUp(facilities) {
     });
   }
 
+  // National leadership is the mean of the 12 states that have it — the only
+  // real data available, not a national figure in any published sense. It
+  // describes those 12, not the other 25 + FCT, and the UI must say so.
+  const nationalLeadership = meanOrNull(
+    [...leadershipByState.values()].map((v) => v.score),
+  );
+
   const national = aggregate({
     id: 'national',
     level: 'national',
     name: 'Nigeria',
     parentId: null,
     facilities,
+    leadershipScore: nationalLeadership,
   });
   national.lgaCount = lgas.length;
 

@@ -36,25 +36,28 @@ export type FacilityThemeId = Exclude<ThemeId, 'leadership_governance'>;
 export type IndicatorClass = 'core' | 'supporting' | 'contextual';
 
 /**
- * Indicator scores take only these three values.
+ * An indicator's score on the 1–5 scale.
  *
- * The rubric presents three response buckets ("1 - Not Ready",
- * "2 - Moderately Ready", "3 - Ready"); those are bucket *labels*, and they map
- * onto a 1–5 scale as 1, 3 and 5. Verified against every `*_score` column in
- * the scored dataset: 6,126 ones, 7,688 threes, 11,381 fives, nothing else.
+ * Under the v2 scoring methodology this is not restricted to {1, 3, 5} — most
+ * of the 20 scored indicators (e.g. power runtime, device sufficiency) span
+ * the full range, verified against every score column in the v2 workbook.
+ * A handful (wiring, data backup, device use) still take only {1, 3, 5},
+ * per that indicator's own rubric-defined scale.
  */
-export type IndicatorScore = 1 | 3 | 5;
+export type IndicatorScore = 1 | 2 | 3 | 4 | 5;
 
 // ---------------------------------------------------------------------------
 // Readiness bands
 // ---------------------------------------------------------------------------
 
 /**
- * The three readiness bands, equal terciles of the 1–5 range.
+ * The three readiness bands.
  *
- * The assessment deck also describes a five-band scheme (Nascent → Optimized).
- * The published figures were produced with these three, so these are what the
- * dashboard ships. See the build guide §3.6 and §17.2.
+ * Not equal terciles under the v2 methodology — the cut points (2.9, 3.9)
+ * come from `Updated Readiness Pivots` Table 6.2, which crosswalks the
+ * deck's five-band scheme (Nascent → Optimized) onto these three: Nascent +
+ * Emerging = Not ready, Developing = Moderately ready, Institutionalized +
+ * Optimized = Ready. See src/lib/bands.ts.
  */
 export type Band = 'not_ready' | 'moderately_ready' | 'ready';
 
@@ -97,19 +100,21 @@ export type UnscoredReason =
 
 export interface IndicatorDef {
   id: string;
-  /** Position in the rubric, 1–132. The join key to `indicatorBindings.mjs`. */
+  /** Position in etl/lib/indicatorsV2.mjs, for stable ordering. */
   n: number;
   themeId: ThemeId;
   subThemeId: string;
-  /** The rubric's own question text. */
+  /** Short indicator label, from Facility Scoring Rubric_v2_WORK. */
   label: string;
   class: IndicatorClass;
-  /** ODK response column(s) feeding this indicator. */
+  /** ODK response column feeding this indicator. */
   sourceColumns: string[];
   /**
-   * The workbook column(s) holding this indicator's 1/3/5 score. Empty for
-   * contextual indicators. Six workflow questions are asked once per service
-   * point and so carry five, one per entry in `servicePointIds`.
+   * The workbook column holding this indicator's score. Empty for contextual
+   * indicators. No indicator is asked once per service point under the v2
+   * methodology, so this is at most one column — `servicePointIds` is always
+   * null now, kept only so a future methodology revision has somewhere to
+   * put it again.
    */
   scoreColumns: string[];
   servicePointIds: ServicePointId[] | null;
@@ -210,15 +215,6 @@ export interface ServicePoint {
   hasDuplicateDocumentation: boolean;
   hasHybridDocumentation: boolean;
   hasBottleneck: boolean;
-
-  /** The workflow theme's five per-service-point indicator scores. */
-  scores: {
-    device: IndicatorScore | null;
-    digitalSkills: IndicatorScore | null;
-    infrastructure: IndicatorScore | null;
-    actionPlan: IndicatorScore | null;
-    sharedStaff: IndicatorScore | null;
-  };
 }
 
 /** The definition, served once from requirements.json. */
@@ -273,14 +269,14 @@ export interface Facility {
   indicatorScores: Record<string, number | null>;
   averageDomainScore: number | null;
 
-  /** Carried verbatim from `final_facility_archetype`. */
-  archetype: Band;
   /**
-   * True for the 26 facilities whose published archetype does not follow the
-   * derived rule in any tested formulation — presumed manual overrides. Flagged
-   * so a future recompute cannot silently "fix" them.
+   * Computed via `classifyFacility()`, not carried from a published column.
+   * The v2 workbook's own archetype field is explicitly labelled "pending
+   * revised archetype rerun" — the assessment team has not re-run their own
+   * classification against the revised scores yet, so there is nothing
+   * authoritative to carry verbatim. See docs/SCORING.md.
    */
-  archetypeIsOverride: boolean;
+  archetype: Band | null;
 
   minimumRequirements: MinimumRequirement[];
   servicePoints: ServicePoint[];
@@ -306,7 +302,7 @@ export interface FacilitySummary {
   lon: number;
   functionalityLevel: FunctionalityLevel;
   isBHCPF: boolean;
-  archetype: Band;
+  archetype: Band | null;
   averageDomainScore: number | null;
   themeScores: Record<FacilityThemeId, number | null>;
   /**
@@ -339,12 +335,18 @@ export interface InvestmentItem {
   label: string;
   themeId: ThemeId;
   category: InvestmentCategory;
+  /** No client-specified rule yet (guide §17.4) — a documented default, see etl/lib/investment.mjs. */
   priority: InvestmentPriority;
+  /** Real — derived from what actually failed at this facility. */
   quantity: number;
-  unitCostNGN: number;
-  totalCostNGN: number;
+  /** Null throughout: no unit-cost table has been signed off (guide §9.1, §17.4). */
+  unitCostNGN: number | null;
+  totalCostNGN: number | null;
   /** Minimum-requirement ids whose failure triggered this item. */
   triggeredBy: string[];
+  /** Set only on rolled-up (LGA/state/national) items: how many facilities
+   *  in scope contributed to this line's quantity. */
+  facilityCount?: number;
 }
 
 export interface RoadmapCell {
@@ -487,10 +489,8 @@ export interface SnapshotMeta {
   facilityCount: number;
   statesPrimary: number;
   statesSecondary: number;
-  /** Agreement between the recomputed archetype and the published column. */
-  archetypeAgreement: number;
-  /** Rubric questions by weighting class — 20 core, 29 supporting, 84 contextual. */
+  /** Indicators by weighting class — 20 scored (core + supporting) under v2. */
   indicatorCounts: Record<IndicatorClass, number>;
-  /** Nodes on the explorer's thematic axis: overall + 4 themes + 10 sub-themes. */
+  /** Nodes on the explorer's thematic axis: overall + 4 themes + 19 sub-themes. */
   thematicNodes: number;
 }

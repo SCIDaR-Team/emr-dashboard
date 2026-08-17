@@ -1,5 +1,5 @@
 export { Card, SectionCard, KpiTile } from './Card';
-export { BandBadge, BandIcon } from './BandBadge';
+export { BandBadge, BandIcon, MaturityBadge } from './BandBadge';
 export { Badge, CountBadge } from './Badge';
 export type { BadgeProps, BadgeTone } from './Badge';
 export { Skeleton, PageSkeleton, EmptyState, LoadError } from './Skeleton';

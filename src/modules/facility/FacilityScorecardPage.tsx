@@ -18,18 +18,23 @@ import {
   EmptyState,
   ExportMenu,
   LoadError,
+  MaturityBadge,
   PageSkeleton,
   SectionCard,
 } from '@/components/ui';
 import { CascadingLocationFilter } from '@/components/filters/CascadingLocationFilter';
 import { DomainDonut } from '@/components/charts';
-import { MinimumRequirementsChecklist, ServicePointGrid } from '@/components/scorecard';
+import {
+  InvestmentList,
+  MinimumRequirementsChecklist,
+  ServicePointGrid,
+} from '@/components/scorecard';
 import { useDataContext } from '@/state/dataContext';
 import { useFacility } from '@/hooks/useFacility';
 import { isNotFound } from '@/hooks/useFetchJSON';
 import { useFilteredData } from '@/hooks/useFilteredData';
 import { explainArchetype } from '@/lib/archetype';
-import { BAND_LABEL } from '@/lib/bands';
+import { BAND_LABEL, BAND_SUBTITLE } from '@/lib/bands';
 import {
   exportCSV,
   exportElementToPDF,
@@ -214,18 +219,17 @@ export default function FacilityScorecardPage() {
                   {facility.lga}, {facility.state}
                 </p>
                 <p className="text-xl font-bold text-brand-700">{facility.name}</p>
-                {facility.archetypeIsOverride && (
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    Readiness level carried verbatim from the published assessment; it does not
-                    follow the standard rule for this facility.
-                  </p>
-                )}
               </div>
               <div className="text-left sm:text-center">
                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Readiness level
                 </p>
                 <BandBadge band={facility.archetype} className="mt-1.5" />
+                {facility.archetype && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {BAND_SUBTITLE[facility.archetype]}
+                  </p>
+                )}
               </div>
               <div className="text-left sm:text-center">
                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -256,6 +260,7 @@ export default function FacilityScorecardPage() {
                     const answer = facility.minimumRequirements.find((m) => m.id === r.id);
                     return { id: r.id, label: r.label, met: answer?.met ?? null };
                   });
+                const investments = facility.investments.filter((i) => i.themeId === theme.id);
 
                 return (
                   <div key={theme.id} className="space-y-4">
@@ -269,7 +274,11 @@ export default function FacilityScorecardPage() {
                         band={themeScore?.band ?? null}
                         ariaLabel={`${theme.label} score, ${formatScore(themeScore?.score ?? null)} of 5`}
                       />
-                      <BandBadge band={themeScore?.band ?? null} size="sm" />
+                      {/* Five-band maturity label here — the Figma's own
+                          scorecard labels each domain donut Nascent through
+                          Optimized, distinct from the three-band badge on the
+                          overall readiness pill above. */}
+                      <MaturityBadge score={themeScore?.score ?? null} size="sm" />
                     </SectionCard>
                     <SectionCard title="Minimum requirements">
                       {requirements.length ? (
@@ -279,10 +288,14 @@ export default function FacilityScorecardPage() {
                       )}
                     </SectionCard>
                     <SectionCard title="Investments">
-                      <EmptyState
-                        title="Awaiting cost table"
-                        message="Item list and quantities are derivable from the data; unit costs need client sign-off (guide §9.1, §17.4)."
-                      />
+                      {investments.length ? (
+                        <InvestmentList items={investments} />
+                      ) : (
+                        <EmptyState
+                          title="No investment needed"
+                          message="Every measured minimum requirement for this theme is met."
+                        />
+                      )}
                     </SectionCard>
                   </div>
                 );

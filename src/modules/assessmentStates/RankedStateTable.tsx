@@ -36,7 +36,7 @@ function buildRows(facilities: FacilitySummary[]): StateRow[] {
     let scoreSum = 0;
     let scoreCount = 0;
     for (const f of rows) {
-      distribution[f.archetype] += 1;
+      if (f.archetype) distribution[f.archetype] += 1;
       if (f.averageDomainScore != null) {
         scoreSum += f.averageDomainScore;
         scoreCount += 1;
