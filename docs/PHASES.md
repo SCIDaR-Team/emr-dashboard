@@ -6,7 +6,51 @@ kickoff prompt for each phase.
 
 **Update this file at the end of every session.** It is the handoff.
 
-**Last updated:** 15 August 2026 · **Overall: ~5.4 of 7 phases (78%)**
+## ⚠ Dataset switch — 16 August 2026
+
+**The ETL now reads `ERA dataset_v4.xlsx` at the repo root — a different
+workbook from the one every phase below was built and verified against**,
+which lived at `../EMR Dashboard/ERA dataset_v4.xlsx` and is still there,
+untouched, read only for XLSForm labels now. Full detail in
+`docs/SCORING.md`; the short version:
+
+- The scoring methodology was consolidated from 94 scored indicators to 20,
+  with class (core/supporting/contextual) given directly by the workbook
+  instead of recovered from column position.
+- Band cut points changed from equal terciles (2.333/3.667) to the
+  workbook's own 5-band→3-band crosswalk (2.9/3.9).
+- **There is no more published archetype to carry verbatim.** The v2
+  workbook's own archetype column is labelled "pending revised archetype
+  rerun" — the assessment team hasn't signed off on this methodology against
+  itself yet. The dashboard now computes the archetype itself, with no
+  external figure to validate it against.
+- The archetype split most of this document quotes as **533 / 1,838 / 433
+  is now historical** — it describes what the v1 workbook produced and what
+  every "verified in-browser" note below was checked against at the time.
+  Recomputed under v2 it is **110 / 1,246 / 1,448** (Technical Infrastructure
+  is the dominant driver — its national mean sits just below the new lower
+  cut). `src/lib/constants.ts`'s `VALIDATION_TARGETS.archetypeCounts` and the
+  Home page waffle chart are updated to the new figure; nothing else below
+  has been rewritten, because the historical record of what was true when it
+  was checked is worth more than a document with no seams.
+- Per-service-point scores are gone — the device question now feeds a
+  Technical Infrastructure indicator instead of a Workflow one, so
+  `ServicePoint` is descriptive-only. Everything else (minimum requirements,
+  service-point descriptive fields, maps, the Explorer's mechanics, exports,
+  the report builder) is unaffected in *shape*, only in the numbers it reads.
+- Two new things this switch surfaced, useful for Phase 6 once it unblocks:
+  a national device-gap total (4,331 available / 10,316 required, from
+  `ERA Data Analysis_Pivot Table`) and a richer 12-state archetype/governance
+  breakdown (`Updated Readiness Pivots`) — neither adds the 25 secondary
+  states or any cost figure, so neither actually unblocks Phase 4 or 6, but
+  both are better validation anchors than existed before.
+
+**Before touching the ETL or `docs/SCORING.md`:** re-read the switch's full
+writeup there first — it documents which specific columns changed name
+(`minimum_required_devices` → `Minimum devices required`, etc.) and the
+exact reasoning behind the new band cut points.
+
+**Last updated:** 16 August 2026 · **Overall: ~5.4 of 7 phases (78%)**
 
 | Phase | Status | |
 |---|---|---|
@@ -189,8 +233,16 @@ the 24 minimum-requirement checks return real booleans. (The spec said 13
 sub-theme nodes; three of those are Leadership & Governance, which has no
 facility instrument, so 10 is the complete facility-level set.)
 
-**Invariant — do not break:** `npm run data:refresh` must keep the archetype
-split at 533 / 1,838 / 433, and `reliablePower` / `powerReady` exact.
+**Invariant — do not break (updated for the v2 dataset, see the notice at the
+top of this file):** `npm run data:refresh` must keep `reliablePower` (42.3%)
+and `powerReady` (34.8%) exact — these read raw response fields the scoring
+revision didn't touch — and the 20-indicator recomputation must keep
+agreeing with each theme sheet's own weighted Core/Supporting columns
+(11,216/11,216 facility-themes, allowing the sheet's own null-propagation
+gaps as documented in `etl/lib/validate.mjs`). The archetype split has **no
+fixed invariant under v2** — it is computed, not published, and is expected
+to move if the source team revises the workbook again; report it, don't gate
+on it.
 
 ---
 
@@ -916,11 +968,15 @@ Two things to know before changing anything in this module:
    implementations — the ETL's and the browser's — and that test is what holds
    them together by recomputing the shipped cube from the shipped summary. If
    you change how a cell is computed, change both.
-2. **Do not round `indicator-scores.json`.** It looks like obvious dead weight
-   at 541 KB of long floats. `11/3` is exactly `BAND_UPPER_CUT` and is reachable
-   by any facility with three of five service points, so rounding at *any*
-   precision moves it from Moderately ready to Ready. There is a test asserting
-   this; if it ever fails, the fix is not to loosen it.
+2. **Do not round theme or sub-theme scores before banding — updated for v2,
+   see the dataset-switch notice at the top of this file.** The specific v1
+   example (`11/3` exactly equal to `BAND_UPPER_CUT`, from a question asked
+   once per service point) no longer applies: v2's indicators are single-
+   column, so `indicator-scores.json` now holds plain integers, not long
+   floats, and `BAND_UPPER_CUT` is 3.9, not `11/3`. The underlying principle
+   still holds and still matters at theme/sub-theme level, where a weighted
+   mean of several indicators can land arbitrarily close to 2.9 or 3.9 — round
+   before banding and a facility can cross a band it never actually reached.
 
 ### Phase 7 — the remainder (current — start here)
 

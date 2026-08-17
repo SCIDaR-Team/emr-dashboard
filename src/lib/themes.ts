@@ -1,11 +1,20 @@
 /**
- * The thematic hierarchy: 5 thematic areas → 13 sub-thematic areas → 132 rubric
- * questions (94 scored, 38 contextual).
+ * The thematic hierarchy: 5 thematic areas → sub-thematic areas → indicators.
  *
- * Labels and question counts are transcribed from
- * `Facility Scoring Rubric - Facility Scoring Rubric.csv`. Question *content*
- * is loaded at runtime from the generated indicators.json — this module holds
- * only the structure, which the Drill-Down Explorer navigates.
+ * The four facility-level themes were reshaped by the v2 scoring methodology
+ * (`Facility Scoring Rubric_v2_WORK`): 94 scored indicators consolidated to
+ * 20, and sub-thematic areas are now close to 1:1 with indicators rather than
+ * grouping many questions under one heading. `SUB_THEMES` below lists only
+ * the 19 sub-themes that carry a scored (core or supporting) indicator —
+ * `computeSubThemeScores` never produces a score for a sub-theme built
+ * entirely of contextual indicators, so a contextual-only subdomain would be
+ * a rail entry that always resolves to nothing. Leadership & Governance is
+ * untouched by v2 — it has no facility instrument and keeps its original
+ * three sub-themes.
+ *
+ * Question *content* is loaded at runtime from the generated indicators.json
+ * — this module holds only the structure, which the Drill-Down Explorer
+ * navigates.
  */
 
 import type { ThemeId, IndicatorClass, IndicatorDef, ThemeNodeId } from './types';
@@ -37,7 +46,7 @@ export const THEMES: readonly ThemeDef[] = [
     shortLabel: 'Tech. Infrastructure',
     role: 'core',
     facilityLevel: true,
-    questionCount: 44,
+    questionCount: 12,
     icon: 'Network',
   },
   {
@@ -47,7 +56,7 @@ export const THEMES: readonly ThemeDef[] = [
     shortLabel: 'Workforce',
     role: 'core',
     facilityLevel: true,
-    questionCount: 17,
+    questionCount: 9,
     icon: 'Users',
   },
   {
@@ -57,7 +66,7 @@ export const THEMES: readonly ThemeDef[] = [
     shortLabel: 'Workflow',
     role: 'supporting',
     facilityLevel: true,
-    questionCount: 42,
+    questionCount: 10,
     icon: 'Workflow',
   },
   {
@@ -107,88 +116,141 @@ export const SUB_THEMES: readonly SubThemeDef[] = [
   {
     id: 'technical_infrastructure.power',
     themeId: 'technical_infrastructure',
-    label:
-      'How can power at facilities be stabilized or upgraded to ensure continuous EMR functionality?',
+    label: 'Operational power availability and functional electrical wiring.',
     shortLabel: 'Power',
-    questionCount: 6,
+    questionCount: 2,
   },
   {
-    id: 'technical_infrastructure.network',
+    id: 'technical_infrastructure.connectivity',
     themeId: 'technical_infrastructure',
-    label:
-      'How can internet and network capacity at facilities be improved or configured to support real-time EMR use?',
-    shortLabel: 'Internet & network',
-    questionCount: 7,
+    label: 'Connectivity readiness based on primary internet method, speed and reliability.',
+    shortLabel: 'Connectivity',
+    questionCount: 1,
   },
   {
-    id: 'technical_infrastructure.hardware',
+    id: 'technical_infrastructure.devices',
     themeId: 'technical_infrastructure',
-    label:
-      'How can hardware, storage, and security systems be made available or enhanced to meet EMR requirements?',
-    shortLabel: 'Hardware & security',
-    questionCount: 31,
+    label: "Supported computing devices against the facility's minimum requirement.",
+    shortLabel: 'Devices',
+    questionCount: 1,
+  },
+  {
+    id: 'technical_infrastructure.power_resilience',
+    themeId: 'technical_infrastructure',
+    label: 'A secondary power pathway when the principal one fails.',
+    shortLabel: 'Power resilience',
+    questionCount: 1,
+  },
+  {
+    id: 'technical_infrastructure.connectivity_resilience',
+    themeId: 'technical_infrastructure',
+    label: 'An alternative internet pathway when the primary one fails.',
+    shortLabel: 'Connectivity resilience',
+    questionCount: 1,
+  },
+  {
+    id: 'technical_infrastructure.device_sustainability',
+    themeId: 'technical_infrastructure',
+    label: 'A routine maintenance arrangement for digital devices.',
+    shortLabel: 'Device maintenance',
+    questionCount: 1,
+  },
+  {
+    id: 'technical_infrastructure.data_resilience',
+    themeId: 'technical_infrastructure',
+    label: 'A data-backup capability for routine service-delivery data.',
+    shortLabel: 'Data backup',
+    questionCount: 1,
   },
 
   // B — Workforce Capacity
   {
-    id: 'workforce_capacity.competency',
+    id: 'workforce_capacity.digital_competency',
     themeId: 'workforce_capacity',
-    label:
-      'How can existing staff competencies be built upon to ensure routine and effective EMR use?',
-    shortLabel: 'Staff competencies',
-    questionCount: 11,
+    label: 'The proportion of permanent staff with basic digital skills.',
+    shortLabel: 'Digital competency',
+    questionCount: 1,
   },
   {
-    id: 'workforce_capacity.roles',
+    id: 'workforce_capacity.roles_and_accountability',
     themeId: 'workforce_capacity',
-    label:
-      'How can staffing roles and accountability structures be clarified or reinforced to support EMR operations?',
+    label: 'A clearly assigned, sufficiently dedicated person responsible for digital-system oversight.',
     shortLabel: 'Roles & accountability',
-    questionCount: 6,
+    questionCount: 1,
+  },
+  {
+    id: 'workforce_capacity.digital_familiarity',
+    themeId: 'workforce_capacity',
+    label: 'Regular staff use of digital devices for basic work or personal tasks.',
+    shortLabel: 'Digital familiarity',
+    questionCount: 1,
+  },
+  {
+    id: 'workforce_capacity.training_readiness',
+    themeId: 'workforce_capacity',
+    label: 'How recent and relevant the most recent digital-health training was.',
+    shortLabel: 'Training readiness',
+    questionCount: 1,
+  },
+  {
+    id: 'workforce_capacity.technical_support',
+    themeId: 'workforce_capacity',
+    label: 'How quickly and through what pathway digital-system issues are resolved.',
+    shortLabel: 'Technical support',
+    questionCount: 1,
   },
 
   // C — Workflow & Transition
   {
-    id: 'workflow_transition.digitization',
+    id: 'workflow_transition.documentation_integration',
     themeId: 'workflow_transition',
-    label:
-      'How can existing workflows be digitized and redesigned through EMR system implementation to improve efficiency?',
-    shortLabel: 'Workflow digitisation',
-    questionCount: 6,
+    label: 'The share of documenting service points affected by repeated or parallel documentation.',
+    shortLabel: 'Documentation integration',
+    questionCount: 1,
   },
   {
-    id: 'workflow_transition.transition',
+    id: 'workflow_transition.workflow_efficiency',
     themeId: 'workflow_transition',
-    label:
-      'How can transition approaches, staff readiness, and workflow adaptations be optimized to ensure smooth and sustainable migration?',
-    shortLabel: 'Transition readiness',
-    questionCount: 22,
+    label: 'The share of documenting service points experiencing delays or bottlenecks.',
+    shortLabel: 'Workflow efficiency',
+    questionCount: 1,
   },
   {
-    id: 'workflow_transition.service_points',
+    id: 'workflow_transition.service_point_environment',
     themeId: 'workflow_transition',
-    label:
-      'To what extent are facility service points configured to support routine point-of-care EMR use?',
-    shortLabel: 'Service points',
-    questionCount: 14,
+    label: 'The share of applicable service points meeting all minimum physical conditions.',
+    shortLabel: 'Service-point environment',
+    questionCount: 1,
+  },
+  {
+    id: 'workflow_transition.change_readiness',
+    themeId: 'workflow_transition',
+    label: 'How willing staff are to fully transition to an EMR system.',
+    shortLabel: 'Change readiness',
+    questionCount: 1,
   },
 
   // D — Data Use & Reporting
   {
-    id: 'data_use_reporting.inefficiencies',
+    id: 'data_use_reporting.routine_data_use',
     themeId: 'data_use_reporting',
-    label:
-      'What inefficiencies exist in current data collection and reporting processes that EMRs can address?',
-    shortLabel: 'Current inefficiencies',
-    questionCount: 4,
+    label: 'How many structured mechanisms routine service-delivery data is used through.',
+    shortLabel: 'Routine data use',
+    questionCount: 1,
   },
   {
-    id: 'data_use_reporting.strengthening',
+    id: 'data_use_reporting.data_quality_review',
     themeId: 'data_use_reporting',
-    label:
-      'How can EMR deployment strengthen data management, reporting accuracy, and decision-making across facilities?',
-    shortLabel: 'Data management',
-    questionCount: 11,
+    label: 'How frequently structured data-validation meetings are held.',
+    shortLabel: 'Data-quality review',
+    questionCount: 1,
+  },
+  {
+    id: 'data_use_reporting.use_of_routine_reports',
+    themeId: 'data_use_reporting',
+    label: 'How often PHC service reports are discussed during data-review processes.',
+    shortLabel: 'Use of routine reports',
+    questionCount: 1,
   },
 
   // E — Leadership & Governance (state level)

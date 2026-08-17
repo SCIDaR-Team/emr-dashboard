@@ -106,6 +106,19 @@ export function percentOf(part: number, whole: number, dp = 0): string {
   return formatPercent((part / whole) * 100, dp);
 }
 
+/**
+ * A share of a population, for display beside its own count.
+ *
+ * As `percentOf`, except a non-zero part that rounds to zero is written `<1%`.
+ * One ready facility out of 255 is a real finding, and "1  0%" beside it reads
+ * as a rounding error or a contradiction.
+ */
+export function formatShare(part: number, whole: number): string {
+  if (!whole) return '—';
+  const share = (part / whole) * 100;
+  return part > 0 && share < 0.5 ? '<1%' : formatPercent(share);
+}
+
 /** Naira, compacted for headline figures (₦100.0bn) or full for tables. */
 export function formatNaira(
   amount: number | null | undefined,

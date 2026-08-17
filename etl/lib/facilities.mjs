@@ -1,16 +1,25 @@
 /**
- * Build the facility records the dashboard serves.
+ * Build the facility records the dashboard serves — v2 methodology.
  *
- * Reads the master sheet of ERA dataset_v4.xlsx and produces one object per
- * facility, carrying the published scores through unchanged and adding the
- * derived flags, indicator scores and service points the scorecard needs.
+ * Reads the merged master+theme-sheet row (see eraDatasetV2.mjs) and produces
+ * one object per facility. Two things differ from the v1 pipeline this
+ * replaces:
  *
- * Design rule: the published `final_facility_archetype` is authoritative and is
- * copied verbatim. The recomputed classification is stored alongside it so the
- * two can be compared, never so one silently overwrites the other. The same
- * holds for the theme scores — the published component columns are what ship,
- * and the recomputation from bound indicator columns is carried beside them and
- * asserted equal on every build.
+ *  - Theme scores are read directly from each theme sheet's own "Revised
+ *    ... weighted Core/Supporting/final score" columns, not recomputed from
+ *    indicator cells and compared against a "published" figure — this
+ *    workbook's own theme sheet *is* the computation. The 20-indicator
+ *    recomputation in scoring.mjs still runs and is asserted equal in
+ *    validate.mjs, catching a wrong indicatorsV2.mjs binding the same way
+ *    the old published-vs-recomputed check caught a wrong
+ *    indicatorBindings.mjs entry.
+ *  - There is no verbatim "published archetype" to carry through. The
+ *    workbook's own archetype column is explicitly labelled "pending revised
+ *    archetype rerun" — the assessment team has not re-run their own
+ *    classification against these revised scores yet. So `archetype` here is
+ *    computed, not copied, using the same core/supporting rule as before
+ *    with the v2 cut points. There is nothing to flag as an "override"
+ *    against, so that field is gone.
  */
 
 import {
@@ -20,49 +29,32 @@ import {
   computeThemeScore,
   meanOrNull,
   readIndicatorCells,
+  toBand,
 } from './scoring.mjs';
 import { deriveMinimumRequirements } from './minimumRequirements.mjs';
 import { deriveInvestments } from './investment.mjs';
 import { buildServicePoints } from './servicePoints.mjs';
+import { normalizeBand } from '../sources/eraDataset.mjs';
+import { INDICATORS_V2, THEME_ROLLUP_COLUMNS } from './indicatorsV2.mjs';
 import { fixMojibake, hasOption, slugify, titleCaseName, toNumber } from './normalize.mjs';
-import { normalizeBand, THEME_COLUMN_PREFIX } from '../sources/eraDataset.mjs';
 
-const THEME_IDS = Object.keys(THEME_COLUMN_PREFIX);
+const THEME_IDS = Object.keys(THEME_ROLLUP_COLUMNS);
 
-/** Locate this theme's score / band columns by their name fragment. */
-function themeColumns(columns, themeId) {
-  const prefix = THEME_COLUMN_PREFIX[themeId];
-  const find = (needle) =>
-    columns.find(
-      (c) => c.toLowerCase().startsWith(prefix) && c.toLowerCase().includes(needle),
-    ) ?? null;
-  return {
-    core: find('core'),
-    supporting: find('supporting'),
-    score: find('final score'),
-    band: find('maturity level'),
-  };
-}
-
-function buildThemeScores(row, themeCols, cellsByTheme, indicatorScores) {
+function buildThemeScores(row, cellsByTheme) {
   return THEME_IDS.map((themeId) => {
-    const cols = themeCols[themeId];
+    const cols = THEME_ROLLUP_COLUMNS[themeId];
     const cells = cellsByTheme[themeId] ?? [];
     const recomputed = computeThemeScore(cells);
 
     return {
       themeId,
-      coreComponent: cols.core ? toNumber(row[cols.core]) : null,
-      supportingComponent: cols.supporting ? toNumber(row[cols.supporting]) : null,
-      score: cols.score ? toNumber(row[cols.score]) : null,
-      band: cols.band ? normalizeBand(row[cols.band]) : null,
+      coreComponent: toNumber(row[cols.core]),
+      supportingComponent: toNumber(row[cols.supporting]),
+      score: toNumber(row[cols.score]),
+      band: normalizeBand(row[cols.band]) ?? toBand(toNumber(row[cols.score])),
 
-      /**
-       * Recomputed from the bound indicator columns and asserted equal to the
-       * published components in validate.mjs. Build-time only — stripped by
-       * toFacilityJSON() rather than shipped, since it is by construction the
-       * same numbers as the two fields above it.
-       */
+      /** Build-time only — stripped by toFacilityJSON(). Asserted equal to
+       *  the sheet's own weighted components in validate.mjs. */
       recomputed,
 
       subThemeScores: computeSubThemeScores(cells),
@@ -72,12 +64,6 @@ function buildThemeScores(row, themeCols, cellsByTheme, indicatorScores) {
 
 /**
  * Project a facility to the shape written to `public/data/facilities/<uuid>.json`.
- *
- * Two things are dropped: the recomputed theme components, which the validation
- * gate has already compared against the published ones, and the labels on the 24
- * minimum requirements, which are identical for every facility and are served
- * once from `requirements.json` instead. Together they are about half the bytes
- * of a facility shard, and the scorecard fetches one per page view.
  */
 export function toFacilityJSON(facility) {
   return {
@@ -91,7 +77,7 @@ export function toFacilityJSON(facility) {
   };
 }
 
-/** Column names on the master sheet, verified against ERA dataset_v4.xlsx. */
+/** Column names on the merged row — raw ODK block, unchanged from v1. */
 const COL = {
   gridConnected: 'C1. Is this facility connected to the national electricity grid?',
   gridHours:
@@ -105,11 +91,14 @@ const COL = {
   devices: 'D1. Which of the following digital devices are available in the facility?',
   printers: 'D1.13 How many printers are available?',
   internetAccess: 'E1. How does the facility primarily access the internet?',
-  internetSpeed: 'Internet speed (download)',
-  emrStatus: 'emr_status',
-  priorDigitalUse: 'prior_use_digital_systems',
-  devicesAvailable: 'computing_devices_available',
-  servicePoints: 'number_service_points',
+  backupInternet: 'E6. Is there another internet option available when the main one is not working?',
+  priorDigitalUse: 'D3. Has this facility used any digital health system before?',
+  transitionedToEMR:
+    'I1. Has this facility previously transitioned from paper-based records to an EMR system?',
+  devicesAvailable: 'Total supported computing devices',
+  verifiedCompliantDevices: 'Verified compliant desktops, laptops and tablets',
+  minimumDevicesRequired: 'Minimum devices required',
+  servicePoints: 'Number of documenting service points',
 };
 
 const ANY_HOURS = new Set(['1_4_hours', '5_8_hours', '9_12_hours', 'gt_12_hours']);
@@ -118,19 +107,12 @@ const NINE_PLUS_HOURS = new Set(['9_12_hours', 'gt_12_hours']);
 const str = (v) => (v == null ? '' : String(v).trim());
 
 /**
- * Descriptive flags, computed from raw responses rather than from scores.
- *
- * These validate the ingest independently of the scoring engine — if they match
- * the published national figures, the rows were read correctly whatever the
- * rubric mapping does. Definitions are the report's own:
- *
- *   reliable power  ≥9 hrs/day from grid, or a fully functional backup that
- *                   runs ≥9 hrs                                      → 42.3% ✓
- *   power-ready     reliable power AND fully functional wiring       → 34.8% ✓
- *
- * Both reproduce exactly on the 2,804-facility base. Electricity access does
- * not — the report computes that one on its 2,696 denominator, so it lands at
- * ~83% here. See build guide §17.3; do not bend the definition to close it.
+ * Descriptive flags, computed from raw responses rather than from scores —
+ * the same definitions as v1, since the raw ODK block these read did not
+ * change between workbook versions. `reliablePower`/`powerReady` reproduce
+ * the new workbook's own "Six Key Readiness Indicators" pivot exactly
+ * (34.8% power-ready, verified against `ERA Data Analysis_Pivot Table`
+ * row 31), confirming the raw fields carried over unchanged.
  */
 function deriveFlags(row) {
   const gridHours = str(row[COL.gridHours]);
@@ -154,27 +136,27 @@ function deriveFlags(row) {
     hasFunctionalWiring: wiring === 'fully_functional',
 
     hasInternetAccess: internet !== '' && internet !== 'no_internet',
-    hasBackupInternet: str(row['E6. Is there another internet option available when the main one is not working?']) === 'yes',
+    hasBackupInternet: str(row[COL.backupInternet]) === 'yes',
 
-    // "Computing device" excludes smartphones — the report counts laptops,
-    // desktops and tablets only.
     hasComputingDevice:
       hasOption(devices, 'laptop') ||
       hasOption(devices, 'tablet') ||
       hasOption(devices, 'desktop') ||
       hasOption(devices, 'desktop_computers'),
     deviceCount: toNumber(row[COL.devicesAvailable]) ?? 0,
+    /** The device-per-point requirement's own numbers — "1 device per service
+     *  point" reads as one *usable* device, so the gap for investment
+     *  purposes is against the verified-compliant count, not the raw total. */
+    verifiedCompliantDeviceCount: toNumber(row[COL.verifiedCompliantDevices]) ?? 0,
+    minimumRequiredDeviceCount: toNumber(row[COL.minimumDevicesRequired]) ?? 0,
     servicePointCount: toNumber(row[COL.servicePoints]) ?? 0,
     printerCount: toNumber(row[COL.printers]) ?? 0,
 
-    // emr_status is only populated (5) for facilities that have transitioned.
-    hasTransitionedToEMR: toNumber(row[COL.emrStatus]) === 5,
-    // Note: the report's 44% uses a 2,278 denominator, not 2,804.
-    usesAnyDigitalSystem: toNumber(row[COL.priorDigitalUse]) === 5,
+    hasTransitionedToEMR: str(row[COL.transitionedToEMR]) === 'yes',
+    usesAnyDigitalSystem: str(row[COL.priorDigitalUse]) === 'yes',
   };
 }
 
-/** ODK writes review state lower-case; the domain type is camelCase. */
 const REVIEW_STATES = {
   approved: 'approved',
   hasissues: 'hasIssues',
@@ -182,31 +164,20 @@ const REVIEW_STATES = {
   edited: 'edited',
 };
 
-export function buildFacilities({
-  dataset,
-  rubric,
-  form,
-  servicePointColumns,
-  requirementColumns,
-}) {
-  const { rows, columns } = dataset;
+export function buildFacilities({ dataset, form, servicePointColumns, requirementColumns }) {
+  const { rows } = dataset;
   const facilities = [];
 
-  // Resolve the theme score columns once rather than per facility — the lookup
-  // is a scan over 379 headers and there are 2,804 rows.
-  const themeCols = Object.fromEntries(
-    THEME_IDS.map((themeId) => [themeId, themeColumns(columns, themeId)]),
-  );
   const indicatorsByTheme = Object.fromEntries(
     THEME_IDS.map((themeId) => [
       themeId,
-      rubric.indicators.filter((i) => i.themeId === themeId && i.scoreColumns.length),
+      INDICATORS_V2.filter((i) => i.themeId === themeId && i.scoreColumns.length),
     ]),
   );
 
   for (const row of rows) {
     const uuid = String(row['UUID'] ?? '').trim();
-    if (!uuid) continue; // no stable key -> cannot be addressed or linked
+    if (!uuid) continue;
 
     const cellsByTheme = Object.fromEntries(
       THEME_IDS.map((themeId) => [
@@ -217,20 +188,23 @@ export function buildFacilities({
     const allCells = Object.values(cellsByTheme).flat();
     const indicatorScores = computeIndicatorScores(allCells);
 
-    const themeScores = buildThemeScores(row, themeCols, cellsByTheme, indicatorScores);
+    const themeScores = buildThemeScores(row, cellsByTheme);
     const scoreMap = Object.fromEntries(themeScores.map((t) => [t.themeId, t.score]));
-
-    const published = normalizeBand(row['final_facility_archetype']);
-    const recomputed = classifyFacility(scoreMap);
+    const archetype = classifyFacility(scoreMap);
 
     const state = String(row['State'] ?? '').trim();
     const lga = String(row['LGA'] ?? '').trim();
     const derived = deriveFlags(row);
     const servicePoints = buildServicePoints(row, servicePointColumns);
+    const minimumRequirements = deriveMinimumRequirements(
+      row,
+      derived,
+      servicePoints,
+      requirementColumns,
+    );
 
     facilities.push({
       uuid,
-      // 2,783 distinct names across 2,804 rows — display only, never a key.
       name: form?.choiceLists?.facility?.[row['database_name']]
         ?? titleCaseName(row['database_name'] ?? row['Name of facility']),
       databaseName: String(row['Name of facility'] ?? ''),
@@ -255,20 +229,11 @@ export function buildFacilities({
       indicatorScores,
       averageDomainScore: meanOrNull(themeScores.map((t) => t.score)),
 
-      archetype: published,
-      recomputedArchetype: recomputed,
-      // 31 of 2,804 follow no tested rule — presumed manual overrides. Flagged
-      // so a later recompute cannot silently "correct" them.
-      archetypeIsOverride: Boolean(published && recomputed && published !== recomputed),
+      archetype,
 
-      minimumRequirements: deriveMinimumRequirements(
-        row,
-        derived,
-        servicePoints,
-        requirementColumns,
-      ),
+      minimumRequirements,
       servicePoints,
-      investments: deriveInvestments(row, derived),
+      investments: deriveInvestments(minimumRequirements, derived, servicePoints),
 
       derived,
       submissionDate: String(row['Submission date'] ?? ''),

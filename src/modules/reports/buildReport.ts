@@ -527,7 +527,7 @@ function facilityPack(input: BuildInput): ReportSection[] {
       caption: `${f.name} — ${f.lga}, ${f.state}`,
       columns: ['Measure', 'Value'],
       rows: [
-        ['Readiness archetype', BAND_LABEL[f.archetype]],
+        ['Readiness archetype', f.archetype ? BAND_LABEL[f.archetype] : 'No data'],
         ['Functionality level', f.functionalityLevel],
         ['Setting', f.geography === 'rural' ? 'Rural' : 'Urban'],
         ['Funding', f.isBHCPF ? 'BHCPF' : 'non-BHCPF'],
@@ -587,7 +587,7 @@ function facilityPack(input: BuildInput): ReportSection[] {
             f.lga,
             f.state,
             f.functionalityLevel,
-            BAND_LABEL[f.archetype],
+            f.archetype ? BAND_LABEL[f.archetype] : 'No data',
             f.averageDomainScore == null ? null : formatScore(f.averageDomainScore, 2),
           ]),
         },

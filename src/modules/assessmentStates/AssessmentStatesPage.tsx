@@ -1,11 +1,15 @@
 import { Building2, CheckCircle2, CircleSlash, MinusCircle, MapPin } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { KpiTile, SectionCard, EmptyState, LoadError, Skeleton } from '@/components/ui';
+import { KpiTile, MaturityBadge, SectionCard, EmptyState, LoadError, Skeleton } from '@/components/ui';
 import { FilterBar } from '@/components/filters/FilterBar';
 import { ArchetypeDonut } from '@/components/charts';
+import { InvestmentTable } from '@/components/scorecard';
 import { RankedStateTable } from './RankedStateTable';
+import { useDataContext } from '@/state/dataContext';
+import { useFilterStore } from '@/store/filterStore';
 import { useFilteredData } from '@/hooks/useFilteredData';
-import { BAND_ACTION, BAND_LABEL } from '@/lib/bands';
+import { aggregateAreaProfiles } from '@/lib/areaProfile';
+import { BAND_ACTION, BAND_DESCRIPTION, BAND_LABEL } from '@/lib/bands';
 import { COVERAGE } from '@/lib/constants';
 import { formatCount, formatScore, percentOf } from '@/lib/format';
 
@@ -21,6 +25,34 @@ import { formatCount, formatScore, percentOf } from '@/lib/format';
 export default function AssessmentStatesPage() {
   const { facilities, allFacilities, metrics, isLoading, isFiltered, error, retry } =
     useFilteredData();
+  const { states, national } = useDataContext();
+  const selectedStates = useFilterStore((s) => s.states);
+
+  // The itemised investment table reflects the selected state(s) — one,
+  // several, or (no selection) all 12 assessed states, aggregated for
+  // anything other than exactly one so picking two states does not silently
+  // fall back to the national total. It does not follow every filter
+  // combination (LGA, functionality, archetype) — those would need a
+  // client-side rollup over per-facility investment items, which the lean
+  // facility summary deliberately does not carry (guide §11's payload
+  // budget). Labelled below rather than silently narrowed.
+  const selectedStateProfiles = selectedStates.length
+    ? states.data.filter((s) => selectedStates.includes(s.name))
+    : [];
+  const singleState = selectedStateProfiles.length === 1 ? selectedStateProfiles[0] : null;
+  const investmentScope =
+    selectedStateProfiles.length === 0
+      ? national.data
+      : selectedStateProfiles.length === 1
+        ? singleState
+        : aggregateAreaProfiles(selectedStateProfiles);
+  const investmentItems = investmentScope?.investments ?? [];
+  const investmentScopeLabel =
+    selectedStateProfiles.length === 0
+      ? null
+      : selectedStateProfiles.length === 1
+        ? (singleState?.name ?? null)
+        : `${selectedStateProfiles.length} selected states`;
 
   // Four different situations that used to reach the reader as one message.
   //   loaded            — render the page
@@ -91,8 +123,13 @@ export default function AssessmentStatesPage() {
             icon={<Building2 className="h-6 w-6" aria-hidden />}
           />
           <KpiTile
-            label="Average domain score"
-            value={`${formatScore(metrics.averageScore)}/5`}
+            label={singleState ? `${singleState.name} score` : 'Average domain score'}
+            value={
+              <span className="flex flex-col gap-1">
+                <span>{formatScore(metrics.averageScore)}/5</span>
+                <MaturityBadge score={metrics.averageScore} size="sm" className="w-fit" />
+              </span>
+            }
             icon={<CheckCircle2 className="h-6 w-6" aria-hidden />}
           />
           <KpiTile
@@ -113,6 +150,11 @@ export default function AssessmentStatesPage() {
           <div className="flex flex-wrap items-center gap-8">
             <ArchetypeDonut
               distribution={metrics.distribution}
+              // The three cards beside the ring already name every band with its
+              // count and share, so the ring's own dot legend would say it twice.
+              // Its arcs carry the figures outside them either way.
+              showLegend={false}
+              className="w-full max-w-[340px] shrink-0 sm:w-auto sm:flex-1"
               ariaLabel={`Archetype split: ${formatCount(metrics.distribution.ready)} ready, ${formatCount(metrics.distribution.moderately_ready)} moderately ready, ${formatCount(metrics.distribution.not_ready)} not ready`}
             />
             <div className="grid flex-1 gap-3 sm:grid-cols-3">
@@ -131,8 +173,9 @@ export default function AssessmentStatesPage() {
                       <p className="text-sm font-medium">{BAND_LABEL[band]}</p>
                     </div>
                     <p className="mt-2 text-2xl font-bold text-brand-700">{formatCount(count)}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {percentOf(count, metrics.total)} of facilities · {BAND_ACTION[band]}
+                    <p className="text-xs text-muted-foreground">{BAND_DESCRIPTION[band]}</p>
+                    <p className="mt-1 text-xs font-medium text-brand-600">
+                      {percentOf(count, metrics.total)} · {BAND_ACTION[band]}
                     </p>
                   </div>
                 );
@@ -143,7 +186,7 @@ export default function AssessmentStatesPage() {
 
         <SectionCard
           title="Readiness by state"
-          subtitle="Facilities assessed and archetype split per state — click a row to scope the page"
+          subtitle="Facilities assessed and archetype split per state — switch between table and bar views; click a row or bar to scope the page"
         >
           {facilities.length === 0 ? (
             // Distinct from the page-level empty state above: the data loaded
@@ -171,12 +214,26 @@ export default function AssessmentStatesPage() {
 
         <SectionCard
           title="Total investments required"
-          subtitle="Itemised: quantity × unit cost"
+          subtitle={
+            investmentScopeLabel
+              ? `Itemised across ${investmentScopeLabel} — ${formatCount(
+                  selectedStateProfiles.reduce((sum, s) => sum + s.facilityCount, 0),
+                )} assessed facilities`
+              : `Itemised across all ${formatCount(COVERAGE.statesPrimary)} assessed states`
+          }
         >
-          <EmptyState
-            title="Awaiting cost table"
-            message="Item list and quantity derivation are specified; unit costs need sign-off. Guide §9.1 and §17.4."
-          />
+          {investmentItems.length ? (
+            <InvestmentTable items={investmentItems} />
+          ) : (
+            <EmptyState
+              title={investmentScope ? 'No investment needed' : 'Loading…'}
+              message={
+                investmentScope
+                  ? 'Every measured minimum requirement across this population is met.'
+                  : undefined
+              }
+            />
+          )}
         </SectionCard>
           </>
         )}

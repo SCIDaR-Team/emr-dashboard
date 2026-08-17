@@ -65,6 +65,29 @@
     --no-data: 150 8% 85%;
 
     /*
+     * The five-level maturity ramp — Nascent → Optimized, red through green.
+     *
+     * A second, finer scale beside the three readiness colours above, for the
+     * places that report a maturity level rather than a readiness band (the
+     * domain score rings and their labels). Ordered as a traffic light, so the
+     * hue moves monotonically and lightness peaks in the middle at yellow: red,
+     * orange, yellow, light green, dark green. Nascent and Optimized sit either
+     * side of the readiness red and green rather than reusing them exactly —
+     * five steps need the extra room at both ends to stay separable, and the two
+     * scales mean different things.
+     */
+    --maturity-nascent: 356 74% 50%;
+    --maturity-nascent-wash: 355 80% 96%;
+    --maturity-emerging: 24 88% 51%;
+    --maturity-emerging-wash: 28 90% 95%;
+    --maturity-developing: 45 92% 53%;
+    --maturity-developing-wash: 48 90% 95%;
+    --maturity-institutionalized: 84 54% 40%;
+    --maturity-institutionalized-wash: 86 55% 94%;
+    --maturity-optimized: 152 52% 24%;
+    --maturity-optimized-wash: 145 45% 94%;
+
+    /*
      * Administrative boundaries on the maps. Near-solid on purpose: these used
      * to be drawn as `--foreground` at 30% alpha, which read as a grey wisp
      * over the readiness fills and vanished entirely over satellite imagery.
@@ -105,6 +128,20 @@
     --not-ready: 356 70% 62%;
     --not-ready-wash: 356 30% 19%;
     --no-data: 158 14% 26%;
+
+    /* The ramp, lifted for a dark surface. The order and the hues hold; only
+       lightness moves, and the dark-green end has to come up furthest or
+       Optimized reads as a hole in the ring. */
+    --maturity-nascent: 356 70% 62%;
+    --maturity-nascent-wash: 356 30% 19%;
+    --maturity-emerging: 26 85% 60%;
+    --maturity-emerging-wash: 26 32% 19%;
+    --maturity-developing: 45 85% 58%;
+    --maturity-developing-wash: 45 30% 18%;
+    --maturity-institutionalized: 84 48% 52%;
+    --maturity-institutionalized-wash: 86 26% 18%;
+    --maturity-optimized: 152 44% 42%;
+    --maturity-optimized-wash: 152 30% 18%;
 
     /* Light, not white: full white at this contrast haloes against the dark
        fills. Same role, same width, inverted for the scheme. */

@@ -25,7 +25,7 @@ import {
   pctReady,
   rankAmong,
 } from './explorerCube';
-import { BAND_UPPER_CUT, toBand } from './bands';
+import { toBand } from './bands';
 import type {
   ExplorerCube,
   FacilitySummary,
@@ -65,15 +65,18 @@ const someFacility = (predicate: (f: FacilitySummary) => boolean) => {
 const firstFacility = someFacility(() => true);
 
 describe('the shipped data has the shape the explorer expects', () => {
-  it('carries 15 thematic nodes across 3,122 geographies', () => {
-    expect(nodes).toHaveLength(15);
+  it('carries 24 thematic nodes across 3,122 geographies', () => {
+    // overall + 4 facility themes + 19 sub-themes (v2: close to 1:1 with the
+    // 20 scored indicators, since the consolidated methodology mostly gives
+    // each indicator its own subdomain — see src/lib/themes.ts).
+    expect(nodes).toHaveLength(24);
     expect(Object.keys(cube)).toHaveLength(3122);
   });
 
-  it('gives every facility all ten sub-theme scores', () => {
+  it('gives every facility all 19 sub-theme scores', () => {
     expect(facilities).toHaveLength(2804);
     for (const f of facilities.slice(0, 50)) {
-      expect(Object.keys(f.subThemeScores)).toHaveLength(10);
+      expect(Object.keys(f.subThemeScores)).toHaveLength(19);
     }
   });
 
@@ -141,13 +144,13 @@ describe('computeCell mirrors the precomputed cube', () => {
 });
 
 describe('the overall node', () => {
-  it("bands back to the published archetype split, because it encodes it", () => {
-    // 533 / 1,838 / 433 — the published figures the ETL gate also asserts.
-    expect(computeCell(facilities, 'overall').distribution).toEqual({
-      ready: 533,
-      moderately_ready: 1838,
-      not_ready: 433,
-    });
+  it("bands back to the facility archetype split, because it encodes it", () => {
+    // Computed under v2, not published — the workbook's own archetype rerun
+    // is still pending (see docs/SCORING.md) — so this is a self-consistency
+    // check against the shipped summary rather than an external figure.
+    const expected = { ready: 0, moderately_ready: 0, not_ready: 0 };
+    for (const f of facilities) if (f.archetype) expected[f.archetype] += 1;
+    expect(computeCell(facilities, 'overall').distribution).toEqual(expected);
   });
 
   it('encodes a facility archetype as its composite weight', () => {
@@ -189,17 +192,21 @@ describe('facilityNodeValue', () => {
 });
 
 describe('the indicator level', () => {
-  const power = 'technical_infrastructure.power.q002';
+  // "Operational power availability" — technical_infrastructure.power's core
+  // indicator, answered by every facility (no skip pattern behind it).
+  const power = 'tech_core_01';
 
   it('is told apart from a cube node structurally, before the matrix loads', () => {
-    // This is what decides whether the 99 KB matrix gets fetched at all, so it
-    // has to be answerable from the static hierarchy alone.
+    // This is what decides whether the matrix gets fetched at all, so it has
+    // to be answerable from the static hierarchy alone.
     for (const node of nodes) expect(isIndicatorNode(node), node).toBe(false);
     for (const id of matrix.ids) expect(isIndicatorNode(id), id).toBe(true);
   });
 
   it('ships one column per scored indicator and one row per facility', () => {
-    expect(matrix.ids).toHaveLength(50);
+    // 20 under v2 — down from 94 scored questions under v1, consolidated in
+    // Facility Scoring Rubric_v2_WORK. See docs/SCORING.md.
+    expect(matrix.ids).toHaveLength(20);
     expect(Object.keys(matrix.byFacility)).toHaveLength(2804);
     expect(matrix.answered).toHaveLength(matrix.ids.length);
     for (const f of facilities.slice(0, 20)) {
@@ -208,9 +215,6 @@ describe('the indicator level', () => {
   });
 
   it('resolves nothing until the matrix arrives — which is not "no data"', () => {
-    // Deliberately a facility that answered q002: 346 of the first 800 did not,
-    // and a null from a non-respondent would pass this test for the wrong
-    // reason — the point is that the *matrix* is what is missing.
     const column = matrix.ids.indexOf(power);
     const f = someFacility((x) => matrix.byFacility[x.uuid]?.[column] != null);
 
@@ -231,8 +235,7 @@ describe('the indicator level', () => {
     const column = matrix.ids.indexOf(power);
     for (const f of facilities.slice(0, 100)) {
       const raw = matrix.byFacility[f.uuid]?.[column] ?? null;
-      const expected = raw == null ? null : Math.max(1, raw);
-      expect(facilityNodeValue(f, power, matrix), f.uuid).toBe(expected);
+      expect(facilityNodeValue(f, power, matrix), f.uuid).toBe(raw);
     }
   });
 
@@ -252,48 +255,16 @@ describe('the indicator level', () => {
     }
   });
 
-  it('reports the skip-pattern questions as thinly answered, not as absent', () => {
+  it('reports the thinnest-answered indicator as thin, not as absent', () => {
     const byId = new Map(indicatorDefs.map((d) => [d.id, d]));
-    // Only asked of facilities that already run an EMR.
-    expect(byId.get('workflow_transition.transition.q070')?.answeredCount).toBe(158);
-    // Answered by 20 of 2,804 — the rail disables nothing here, it says n.
-    expect(byId.get('data_use_reporting.inefficiencies.q106')?.answeredCount).toBe(20);
-  });
-
-  it('lifts the four worst-case-as-zero columns onto the 1–5 floor', () => {
-    // The same clamp computeSubThemeScores applies in the ETL, for the same
-    // reason: a national mean of 0.06 against a 1–5 band scale reads as a
-    // broken chart. It moves nothing across a band — 0 and 1 are both Not ready.
-    const zeroCoded = 'workflow_transition.digitization.q066';
-    const column = matrix.ids.indexOf(zeroCoded);
-    const rawZeros = facilities.filter(
-      (f) => matrix.byFacility[f.uuid]?.[column] === 0,
-    );
-    expect(rawZeros.length).toBeGreaterThan(0);
-
-    for (const f of rawZeros.slice(0, 50)) {
-      expect(facilityNodeValue(f, zeroCoded, matrix)).toBe(1);
+    // "Staff willingness to transition fully to EMR" — the only v2 indicator
+    // behind a meaningful skip pattern (2,636 of 2,804 answered).
+    expect(byId.get('flow_sup_01')?.answeredCount).toBe(2636);
+    // Every other indicator is answered by at least 2,780 — coverage is far
+    // more uniform under v2 than the old rubric's 20-respondent minimum.
+    for (const def of indicatorDefs.filter((d) => d.scoreColumns.length)) {
+      expect(def.answeredCount, def.id).toBeGreaterThanOrEqual(2636);
     }
-    const cell = computeCell(facilities, zeroCoded, matrix);
-    expect(cell.score).toBeGreaterThanOrEqual(1);
-    expect(cell.band).toBe('not_ready');
-  });
-
-  it('leaves values unrounded, because the upper cut point is reachable', () => {
-    // 11/3 IS BAND_UPPER_CUT — a question asked once per service point, at a
-    // facility with three of the five present. Rounded to any number of decimal
-    // places it lands above the cut and the facility silently becomes Ready.
-    expect(11 / 3).toBe(BAND_UPPER_CUT);
-    expect(toBand(11 / 3)).toBe('moderately_ready');
-    for (const dp of [2, 4, 6, 8]) {
-      expect(toBand(Number((11 / 3).toFixed(dp))), `${dp}dp`).toBe('ready');
-    }
-
-    // So the shipped file must not have rounded them.
-    const thirds = Object.values(matrix.byFacility)
-      .flat()
-      .filter((v) => v != null && String(v).length > 8);
-    expect(thirds.length).toBeGreaterThan(0);
   });
 
   it('bands an indicator cell on the same three-way scale as every other node', () => {

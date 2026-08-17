@@ -1,25 +1,18 @@
 /**
  * Facility archetype classification and state roll-up.
  *
- * The rule below was recovered empirically from the 2,804 scored facilities in
- * `ERA dataset_v4.xlsx` and reproduces the published `final_facility_archetype`
- * column for 2,773 of them (98.89%).
+ * Under the v1 methodology this rule reproduced the workbook's published
+ * `final_facility_archetype` column for 98.89% of facilities, and the ETL
+ * carried that column through verbatim rather than overwrite it.
  *
- * Alternatives tested, with the exact tercile cut points:
- *   no supporting-floor clause ........ 95.19%
- *   supporting floor fitted to 2.46 ... 99.00%  (3 better; overfit, not used)
- *   mean(all four themes) ............. 72.6%
- *   min(all four themes) .............. 69.3%
- *
- * The facilities that a core-only rule misses all fail the same way: their core
- * scores say Ready but the published column says Moderately ready. The
- * supporting floor captures most of them. The 31 residual facilities follow no
- * tested formulation and are presumed manual overrides in the source
- * spreadsheet.
- *
- * Consequence: the ETL carries the published column through verbatim. This
- * module exists to *explain* an archetype and to recompute one when the user
- * filters the facility population — not to overwrite what was published.
+ * The v2 workbook has no equivalent to carry: its own archetype column is
+ * explicitly labelled "pending revised archetype rerun" — the assessment
+ * team has not re-run their own classification against the revised theme
+ * scores yet. So under v2 this rule (with the v2 cut points, 2.9/3.9) *is*
+ * the archetype, computed fresh for every facility rather than explained
+ * after the fact. `SUPPORTING_FLOOR` is carried over unchanged from v1
+ * because nothing in the new workbook gives a basis to refit it — treat it
+ * as provisional pending the source team's own rerun.
  */
 
 import type { Band, FacilityThemeId } from './types';
@@ -113,21 +106,24 @@ const COMPOSITE_WEIGHT: Record<Band, number> = {
  *   (5·ready + 3·moderatelyReady + 1·notReady) / totalFacilities
  *
  * Yields a 1–5 value on the same scale as a theme score, so it can be banded
- * with the same terciles.
+ * with the same cut points. Null archetypes (a facility missing both core
+ * theme scores) are dropped from the numerator but not the denominator —
+ * an unclassifiable facility still counts against the total, it just
+ * contributes no weight.
  */
-export function compositeReadiness(archetypes: Band[]): number | null {
+export function compositeReadiness(archetypes: (Band | null)[]): number | null {
   if (archetypes.length === 0) return null;
-  const total = archetypes.reduce((sum, a) => sum + COMPOSITE_WEIGHT[a], 0);
+  const total = archetypes.reduce((sum, a) => sum + (a ? COMPOSITE_WEIGHT[a] : 0), 0);
   return total / archetypes.length;
 }
 
-export function archetypeDistribution(archetypes: Band[]): Record<Band, number> {
+export function archetypeDistribution(archetypes: (Band | null)[]): Record<Band, number> {
   const dist: Record<Band, number> = {
     not_ready: 0,
     moderately_ready: 0,
     ready: 0,
   };
-  for (const a of archetypes) dist[a] += 1;
+  for (const a of archetypes) if (a) dist[a] += 1;
   return dist;
 }
 

@@ -11,8 +11,19 @@
 // Bands
 // ---------------------------------------------------------------------------
 
-export const BAND_LOWER_CUT = 1 + 4 / 3; // 2.3333…
-export const BAND_UPPER_CUT = 1 + 8 / 3; // 3.6666…
+/**
+ * Cut points under the v2 methodology.
+ *
+ * Not equal terciles — they come from `Updated Readiness Pivots` Table 6.2,
+ * which crosswalks the deck's five-band scheme onto the three-band one:
+ * Nascent (1.0–1.9) + Emerging (2.0–2.9) = Not ready; Developing (3.0–3.9) =
+ * Moderately ready; Institutionalized (4.0–4.5) + Optimized (4.6–5.0) =
+ * Ready. Verified against a sample row: a final score of exactly 2.9 carries
+ * the sheet's own "Emerging" / "Not Ready" labels, confirming the lower cut
+ * is inclusive at 2.9.
+ */
+export const BAND_LOWER_CUT = 2.9;
+export const BAND_UPPER_CUT = 3.9;
 
 export function toBand(score) {
   if (score == null || !Number.isFinite(score)) return null;

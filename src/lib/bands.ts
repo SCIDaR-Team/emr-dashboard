@@ -1,20 +1,20 @@
 /**
  * Readiness bands — the three-way classification used across every surface.
  *
- * Derived from `ERA dataset_v4.xlsx` by reading the score range of each
- * published `…(maturity level)` label across all four scored themes:
- *
- *   Not ready         TI ≤2.333  WF ≤2.200  WK ≤2.333  DU ≤2.100
- *   Moderately ready  TI 2.350–3.667  WF 2.400–3.600  WK 2.337–3.673  DU 2.400–3.600
- *   Ready             TI 3.675–4.694  WF 3.800–5.000  WK 3.677–4.805  DU 3.700–4.650
- *
- * The cut points are equal terciles of the 1–5 range: 1 + 4/3 and 1 + 8/3.
+ * The v2 workbook (`Updated Readiness Pivots`, Table 6.2) gives an explicit
+ * crosswalk from its five-band scheme onto three: Nascent (1.0–1.9) +
+ * Emerging (2.0–2.9) = Not ready, Developing (3.0–3.9) = Moderately ready,
+ * Institutionalized (4.0–4.5) + Optimized (4.6–5.0) = Ready. Not equal
+ * terciles — the cut points are 2.9 and 3.9, matching `MATURITY_BANDS`
+ * below exactly. Verified against a sample row: a final score of exactly
+ * 2.9 carries the sheet's own "Emerging" / "Not Ready" labels, confirming
+ * the lower cut is inclusive at 2.9.
  */
 
 import type { Band, MaturityLevel } from './types';
 
-export const BAND_LOWER_CUT = 1 + 4 / 3; // 2.3333…
-export const BAND_UPPER_CUT = 1 + 8 / 3; // 3.6666…
+export const BAND_LOWER_CUT = 2.9;
+export const BAND_UPPER_CUT = 3.9;
 
 export const BANDS: readonly Band[] = ['not_ready', 'moderately_ready', 'ready'] as const;
 
@@ -36,6 +36,23 @@ export const BAND_ACTION: Record<Band, string> = {
   not_ready: 'Foundational investment',
   moderately_ready: 'Targeted intervention',
   ready: 'Immediate roll out',
+};
+
+/** One-line description of what a band means for facilities in it — the
+ *  Assessment States archetype legend's subtext, one level plainer than
+ *  `BAND_ACTION`. */
+export const BAND_DESCRIPTION: Record<Band, string> = {
+  ready: 'Facilities ready for EMR deployment',
+  moderately_ready: 'Facilities moderately ready',
+  not_ready: 'Facilities not ready',
+};
+
+/** The short subtitle under the readiness pill — Facility Scorecard,
+ *  State Summary. */
+export const BAND_SUBTITLE: Record<Band, string> = {
+  ready: 'Immediate roll-out ready',
+  moderately_ready: 'Targeted interventions required',
+  not_ready: 'Foundational investment required',
 };
 
 export const BAND_TIMELINE: Record<Band, string> = {
@@ -194,9 +211,84 @@ export const MATURITY_BANDS: readonly {
   { level: 'optimized', label: 'Optimized', min: 4.6, max: 5.0 },
 ] as const;
 
-/** Note the deck's bands are not uniform — Institutionalized spans 0.5 where
- *  the others span 0.9/0.4 — so this is a table lookup, not arithmetic. */
+/** Ascending, worst to best — the order the ramp is read in. */
+export const MATURITY_LEVELS: readonly MaturityLevel[] = MATURITY_BANDS.map((b) => b.level);
+
+export const MATURITY_LABEL: Record<MaturityLevel, string> = Object.fromEntries(
+  MATURITY_BANDS.map((b) => [b.level, b.label]),
+) as Record<MaturityLevel, string>;
+
+/**
+ * The maturity ramp — a traffic light across five steps.
+ *
+ * Where a surface reports a *level* rather than a readiness band, it is coloured
+ * from here: red for Nascent, orange for Emerging, yellow for Developing, light
+ * green for Institutionalized, dark green for Optimized. Client direction, and
+ * it earns its place — a domain score of 4.6 and one of 4.0 are both "Ready" on
+ * the three-band scale, and this is the scale that separates them.
+ *
+ * The two scales coexist rather than compete: `BAND_*` above stays the
+ * vocabulary for readiness (what to do about a facility), and this is the
+ * vocabulary for maturity (how far along a domain is). Nothing reads both about
+ * the same figure at the same time.
+ */
+export const MATURITY_CSS_VAR: Record<MaturityLevel, string> = {
+  nascent: '--maturity-nascent',
+  emerging: '--maturity-emerging',
+  developing: '--maturity-developing',
+  institutionalized: '--maturity-institutionalized',
+  optimized: '--maturity-optimized',
+};
+
+/** Tailwind class fragments per level, mirroring `BAND_CLASSES`. */
+export const MATURITY_CLASSES: Record<MaturityLevel, { text: string; bg: string; wash: string }> = {
+  nascent: {
+    text: 'text-maturity-nascent',
+    bg: 'bg-maturity-nascent',
+    wash: 'bg-maturity-nascent-wash',
+  },
+  emerging: {
+    text: 'text-maturity-emerging',
+    bg: 'bg-maturity-emerging',
+    wash: 'bg-maturity-emerging-wash',
+  },
+  developing: {
+    text: 'text-maturity-developing',
+    bg: 'bg-maturity-developing',
+    wash: 'bg-maturity-developing-wash',
+  },
+  institutionalized: {
+    text: 'text-maturity-institutionalized',
+    bg: 'bg-maturity-institutionalized',
+    wash: 'bg-maturity-institutionalized-wash',
+  },
+  optimized: {
+    text: 'text-maturity-optimized',
+    bg: 'bg-maturity-optimized',
+    wash: 'bg-maturity-optimized-wash',
+  },
+};
+
+/** Resolve a level to its live colour, reading the variable at call time so the
+ *  value tracks light/dark. Canvas only — HTML uses `MATURITY_CLASSES`. */
+export function maturityColor(level: MaturityLevel | null, el?: HTMLElement): string {
+  const root = el ?? document.documentElement;
+  const name = level ? MATURITY_CSS_VAR[level] : '--no-data';
+  return `hsl(${getComputedStyle(root).getPropertyValue(name).trim()})`;
+}
+
+/**
+ * Note the deck's bands are not uniform — Institutionalized spans 0.5 where
+ * the others span 0.9/0.4 — so this is a table lookup, not arithmetic.
+ *
+ * Rounded to 1dp before matching. A mean over several indicators lands on
+ * boundary values like 3.9999999999999996 as often as it lands on 4 exactly,
+ * and the bands abut with no gap between them (3.9 / 4.0) — compared
+ * unrounded, that value clears neither band's bounds and falls through to
+ * null, showing "No data" for a score the donut beside it displays as 4.0.
+ */
 export function toMaturityLevel(score: number | null): MaturityLevel | null {
   if (score == null || !Number.isFinite(score)) return null;
-  return MATURITY_BANDS.find((b) => score >= b.min && score <= b.max)?.level ?? null;
+  const rounded = Math.round(score * 10) / 10;
+  return MATURITY_BANDS.find((b) => rounded >= b.min && rounded <= b.max)?.level ?? null;
 }

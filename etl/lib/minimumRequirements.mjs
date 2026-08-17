@@ -66,8 +66,12 @@ export const REQUIREMENTS = [
 
 /** ODK question codes the checks read, resolved once per build. */
 const COLUMN_REFS = {
-  minimumRequiredDevices: '=minimum_required_devices',
-  computingDevices: '=computing_devices_available',
+  minimumRequiredDevices: '=Minimum devices required',
+  // "Verified compliant desktops, laptops and tablets" — deployable devices,
+  // not "Total supported computing devices" (DI), which also counts
+  // smartphones and devices needing repair. The requirement is "1 device per
+  // service point", which reads as one *usable* device, not any device.
+  computingDevices: '=Verified compliant desktops, laptops and tablets',
   backupMethod: 'L5',
   backupFrequency: 'L5.1',
   documentedSop: 'L6',

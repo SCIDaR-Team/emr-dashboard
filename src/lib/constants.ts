@@ -122,6 +122,19 @@ export const SERVICE_POINTS = [
  * inclusion rule or an indicator mapping is wrong — and stakeholders will be
  * holding the report next to the dashboard on day one.
  */
+/**
+ * Figures the Home page's waffle chart and coverage strapline paint from
+ * immediately, without a data fetch — see LandingPage.tsx.
+ *
+ * `archetypeCounts` was the published `final_facility_archetype` split under
+ * the v1 workbook. Under v2 there is no published split to quote — the
+ * workbook's own archetype rerun is still pending — so this is the figure
+ * `npm run data:refresh` currently computes (see docs/SCORING.md). It will
+ * need updating again once the source team finalises their own
+ * classification; there is deliberately no live fetch here to catch that
+ * automatically, since the Landing page's whole point is to paint before
+ * `DataProvider` has anything loaded.
+ */
 export const VALIDATION_TARGETS = {
   electricityAccessPct: 85.2,
   reliablePowerPct: 42.3,
@@ -130,10 +143,7 @@ export const VALIDATION_TARGETS = {
   computingDevicePct: 82,
   emrTransitionedPct: 6,
   anyDigitalSystemPct: 44,
-  /** Published archetype split across the 2,804 scored facilities. */
-  archetypeCounts: { ready: 533, moderately_ready: 1838, not_ready: 433 },
-  /** Minimum acceptable agreement between recomputed and published archetype. */
-  minArchetypeAgreement: 0.99,
+  archetypeCounts: { ready: 110, moderately_ready: 1246, not_ready: 1448 },
 } as const;
 
 // ---------------------------------------------------------------------------

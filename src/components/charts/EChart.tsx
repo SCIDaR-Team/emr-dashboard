@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 import ReactECharts from 'echarts-for-react';
-import type { EChartsOption } from 'echarts';
+import type { ECharts, EChartsOption } from 'echarts';
 import { cn } from '@/lib/cn';
 import { useThemeStore } from '@/store/themeStore';
 import { chartBase, useChartTheme } from './chartTheme';
@@ -11,7 +11,24 @@ export interface EChartProps {
   className?: string;
   /** Screen-reader description. A canvas is opaque to assistive tech. */
   ariaLabel: string;
-  onEvents?: Record<string, (params: unknown) => void>;
+  /**
+   * ECharts event handlers. The live instance arrives as the second argument —
+   * a handler that changes the option (a click that re-scopes the page, say)
+   * needs it to dismiss the tooltip first. See the note on `notMerge` below.
+   */
+  onEvents?: Record<string, (params: unknown, instance: ECharts) => void>;
+  /**
+   * Identity of the data behind the chart. When it changes the inner chart is
+   * remounted — a fresh instance — instead of being handed a new option.
+   *
+   * Only needed for charts whose click handlers change what they are plotting.
+   * See the note on `notMerge` below: an in-place option swap can strand the
+   * tooltip's axis pointer on series that no longer exist, and disposing the
+   * instance is the one fix that cannot leave state behind. Key it on data
+   * *membership*, not on order — sorting the same rows should animate, not
+   * remount.
+   */
+  instanceKey?: string | number;
 }
 
 /**
@@ -34,8 +51,25 @@ export interface EChartProps {
  * The resize helper resolves the live instance on every call rather than
  * capturing one: the keyed remount disposes the old chart, and resizing a
  * disposed instance logs an ECharts warning on every frame.
+ *
+ * One sharp edge to know about, because `notMerge` is what causes it: a
+ * `setOption` here replaces the series wholesale, and an axis-triggered
+ * tooltip that is on screen at that moment still holds the series data it was
+ * drawn from. The next pointer move then reads a disposed dataset and throws
+ * `Cannot read properties of undefined (reading 'getRawIndex')` out of a
+ * zrender handler, where no React error boundary can see it. Dismissing the
+ * tooltip in the handler helps but does not close it — the axis pointer keeps
+ * its own references — so a chart that re-plots on click passes `instanceKey`
+ * and gets a fresh instance instead.
  */
-export function EChart({ option, height = 320, className, ariaLabel, onEvents }: EChartProps) {
+export function EChart({
+  option,
+  height = 320,
+  className,
+  ariaLabel,
+  onEvents,
+  instanceKey,
+}: EChartProps) {
   const scheme = useThemeStore((s) => s.scheme);
   const theme = useChartTheme();
   const chartRef = useRef<ReactECharts>(null);
@@ -93,7 +127,7 @@ export function EChart({ option, height = 320, className, ariaLabel, onEvents }:
     >
       <ReactECharts
         ref={chartRef}
-        key={scheme}
+        key={instanceKey == null ? scheme : `${scheme}:${instanceKey}`}
         option={themedOption}
         notMerge
         lazyUpdate

@@ -31,3 +31,7 @@ etl/data/
 # every Scorecard route 404s while the rest of the dashboard looks healthy.
 # The generated data is committed instead, and refreshed by re-running the ETL
 # locally and committing the diff. See docs/DEPLOYMENT.md.
+emr-readiness-by-state.csv
+emr-scorecard-1-garaku-primary-health-centre-kokona.pdf
+emr-scorecard-1-garaku-primary-health-centre-kokona.png
+ERA dataset_v4.xlsx

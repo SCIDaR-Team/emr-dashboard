@@ -2,17 +2,26 @@
 /**
  * ETL orchestrator — `npm run data:refresh`.
  *
- * Reads the scored assessment workbook and emits the static JSON the dashboard
- * serves. Everything is precomputed here: the assessment is complete, the
- * dataset never changes, and scoring 132 indicators across 2,804 facilities in
- * the browser on every filter change would be waste.
+ * Reads the scored assessment workbook and emits the static JSON the
+ * dashboard serves. Everything is precomputed here: the assessment is
+ * complete, and scoring 20 indicators across 2,804 facilities in the browser
+ * on every filter change would be waste.
  *
- * Source of truth is `ERA dataset_v4.xlsx`, NOT the raw `.xlsb` export — the
- * xlsx carries the computed scores, the facility UUID, functionality level and
- * BHCPF flag, none of which are in the ODK export.
+ * Source of truth is `ERA dataset_v4.xlsx` at the repo root — the v2 workbook
+ * the assessment team delivered with a consolidated, 20-indicator scoring
+ * methodology (down from 94). It replaces the earlier copy in
+ * `../EMR Dashboard/`, which `eraDataset.mjs`/`scoringRubric.mjs` still know
+ * how to read but nothing here calls anymore. See docs/SCORING.md for what
+ * changed and why.
+ *
+ * The v2 workbook has no `survey`/`choices` sheets, so field and geography
+ * labels still come from the old file — the underlying ODK instrument did not
+ * change, only the scoring layered on top of it. If that file is not found,
+ * labels fall back to `titleCaseName()` and the build continues; label
+ * quality is a display concern, not a correctness one.
  *
  * Usage:
- *   node etl/build.mjs [--source <path>] [--out <dir>] [--strict]
+ *   node etl/build.mjs [--source <path>] [--labels-source <path>] [--out <dir>] [--strict]
  *
  *   --strict  fail the build when a validation target drifts (use in CI)
  */
@@ -22,16 +31,14 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 
-import {
-  readEraDataset,
-  resolveColumn,
-  verifyThemeComponents,
-} from './sources/eraDataset.mjs';
-import { readScoringRubric } from './sources/scoringRubric.mjs';
+import { readEraDatasetV2 } from './sources/eraDatasetV2.mjs';
+import { resolveColumn } from './sources/eraDataset.mjs';
 import { readXlsForm } from './sources/xlsform.mjs';
+import { readStateLeadership } from './sources/stateLeadership.mjs';
 import { buildFacilities, toFacilityJSON } from './lib/facilities.mjs';
 import { buildRequirementColumns, REQUIREMENTS } from './lib/minimumRequirements.mjs';
 import { buildServicePointColumns } from './lib/servicePoints.mjs';
+import { INDICATORS_V2 } from './lib/indicatorsV2.mjs';
 import { rollUp } from './lib/rollup.mjs';
 import { buildExplorerCube } from './lib/explorerCube.mjs';
 import { attachAnsweredCounts, buildIndicatorMatrix } from './lib/indicatorMatrix.mjs';
@@ -39,14 +46,8 @@ import { validate } from './lib/validate.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 
-const DEFAULT_SOURCE = path.resolve(
-  ROOT,
-  '../EMR Dashboard/ERA dataset_v4.xlsx',
-);
-const DEFAULT_RUBRIC = path.resolve(
-  ROOT,
-  '../EMR Dashboard/Facility Scoring Rubric - Facility Scoring Rubric.csv',
-);
+const DEFAULT_SOURCE = path.resolve(ROOT, 'ERA dataset_v4.xlsx');
+const DEFAULT_LABELS_SOURCE = path.resolve(ROOT, '../EMR Dashboard/ERA dataset_v4.xlsx');
 
 function arg(name, fallback) {
   const i = process.argv.indexOf(`--${name}`);
@@ -55,55 +56,47 @@ function arg(name, fallback) {
 
 async function main() {
   const source = path.resolve(arg('source', DEFAULT_SOURCE));
-  const rubricPath = path.resolve(arg('rubric', DEFAULT_RUBRIC));
+  const labelsSource = path.resolve(arg('labels-source', DEFAULT_LABELS_SOURCE));
   const outDir = path.resolve(arg('out', path.join(ROOT, 'public/data')));
   const strict = process.argv.includes('--strict');
 
   if (!existsSync(source)) {
     console.error(`✗ Source workbook not found: ${source}`);
-    console.error('  Pass --source <path> or place ERA dataset_v4.xlsx alongside the repo.');
+    console.error('  Pass --source <path> or place ERA dataset_v4.xlsx at the repo root.');
     process.exit(1);
   }
 
   console.log(`▸ Reading ${path.basename(source)}`);
-  const dataset = await readEraDataset(source);
-  console.log(`  ${dataset.rows.length} scored facilities, ${dataset.columns.length} columns`);
+  const dataset = await readEraDatasetV2(source);
+  console.log(`  ${dataset.rows.length} scored facilities, ${dataset.columns.length} merged columns`);
 
-  console.log('▸ Reading scoring rubric');
-  const rubric = await readScoringRubric(rubricPath, dataset);
-  console.log(
-    `  ${rubric.indicators.length} indicators ` +
-      `(${rubric.counts.core} core, ${rubric.counts.supporting} supporting, ${rubric.counts.contextual} contextual)`,
-  );
-  for (const e of rubric.excluded) {
-    console.log(`  · excluded from the ${e.themeId} mean — ${e.column}: ${e.reason}`);
+  console.log('▸ Reading XLSForm survey + choices (for labels)');
+  let form = { labels: {}, choiceLists: {}, lgasByState: new Map() };
+  if (existsSync(labelsSource)) {
+    form = await readXlsForm(labelsSource);
+    console.log(`  ${Object.keys(form.labels).length} field labels, ${form.lgasByState.size} states in choice list`);
+  } else {
+    console.log(`  ⚠ ${labelsSource} not found — falling back to titleCaseName() for display names`);
   }
-
-  console.log('▸ Verifying the derived indicator classes');
-  const componentCheck = verifyThemeComponents(dataset.themeSheets, rubric.byTheme);
-  for (const line of componentCheck.lines) console.log(`  ${line}`);
-  if (!componentCheck.ok) {
-    console.error('✗ The core/supporting split no longer reproduces the published components.');
-    process.exit(1);
-  }
-
-  console.log('▸ Reading XLSForm survey + choices');
-  const form = await readXlsForm(source);
-  console.log(`  ${Object.keys(form.labels).length} field labels, ${form.lgasByState.size} states in choice list`);
 
   console.log('▸ Building facilities');
   const servicePointColumns = buildServicePointColumns(dataset.index, resolveColumn);
   const requirementColumns = buildRequirementColumns(dataset.index, resolveColumn);
   const facilities = buildFacilities({
     dataset,
-    rubric,
     form,
     servicePointColumns,
     requirementColumns,
   });
 
+  console.log('▸ Reading state leadership scoring (Leadership & Governance, 12 primary states)');
+  const leadershipByState = await readStateLeadership(source);
+  console.log(
+    `  ${leadershipByState.size} states — partial coverage (4 of 14 rubric questions); see docs/SCORING.md`,
+  );
+
   console.log('▸ Rolling up to LGA, state and national');
-  const { lgas, states, national } = rollUp(facilities);
+  const { lgas, states, national } = rollUp(facilities, leadershipByState);
   console.log(`  ${lgas.length} LGAs, ${states.length} states`);
 
   console.log('▸ Building explorer cube');
@@ -113,15 +106,15 @@ async function main() {
   // The explorer's fourth thematic level. Not folded into the cube — see
   // indicatorMatrix.mjs — and fetched by the browser only on demand.
   console.log('▸ Building indicator matrix');
-  const indicatorMatrix = buildIndicatorMatrix({ facilities, indicators: rubric.indicators });
-  const indicatorDefs = attachAnsweredCounts(rubric.indicators, indicatorMatrix);
+  const indicatorMatrix = buildIndicatorMatrix({ facilities, indicators: INDICATORS_V2 });
+  const indicatorDefs = attachAnsweredCounts(INDICATORS_V2, indicatorMatrix);
   const neverAnswered = indicatorMatrix.answered.filter((n) => n === 0).length;
   console.log(
     `  ${indicatorMatrix.ids.length} scored indicators × ${facilities.length} facilities` +
       (neverAnswered ? ` · ${neverAnswered} never answered by any facility` : ''),
   );
 
-  console.log('▸ Validating against published figures');
+  console.log('▸ Validating');
   const report = validate({ facilities, states });
   for (const line of report.lines) console.log(`  ${line}`);
   if (!report.ok) {
@@ -133,15 +126,6 @@ async function main() {
   // ---- Emit -------------------------------------------------------------
   await mkdir(path.join(outDir, 'facilities'), { recursive: true });
 
-  // The lean row every list, map and filter reads. It carries every field the
-  // filter bar can narrow on — a control that cannot actually filter is worse
-  // than an absent one — plus the theme and sub-theme scores, which is what
-  // lets the Drill-Down Explorer recompute its cube in the browser when a
-  // filter is active (guide §8.4). Without the sub-theme scores the explorer's
-  // ten sub-theme nodes would go blank the moment anything was filtered, and a
-  // rail entry that resolves to nothing under a filter is the same broken
-  // promise as a control that does nothing. Ten more numbers per row costs
-  // ~19 KB gzipped over the whole file.
   const summary = facilities.map((f) => ({
     uuid: f.uuid,
     name: f.name,
@@ -185,10 +169,12 @@ async function main() {
     facilityCount: facilities.length,
     statesPrimary: states.filter((s) => s.evidenceGrade === 'primary').length,
     statesSecondary: states.filter((s) => s.evidenceGrade === 'secondary').length,
-    archetypeAgreement: report.archetypeAgreement,
-    indicatorCounts: rubric.counts,
+    indicatorCounts: {
+      core: INDICATORS_V2.filter((i) => i.class === 'core').length,
+      supporting: INDICATORS_V2.filter((i) => i.class === 'supporting').length,
+      contextual: INDICATORS_V2.filter((i) => i.class === 'contextual').length,
+    },
     thematicNodes: nodes.length,
-    /** The on-demand fourth level — not in the cube. */
     indicatorNodes: indicatorMatrix.ids.length,
   });
 

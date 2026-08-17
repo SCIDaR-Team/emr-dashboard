@@ -24,6 +24,13 @@ export interface FilterBarProps {
   /** The unfiltered population. Option counts are computed from it. */
   facilities: FacilitySummary[];
   show?: FilterKey[];
+  /**
+   * Page-specific controls, rendered in the same row as the shared ones,
+   * before Reset. A page whose control needs different option counts than the
+   * shared one (State Summary's Readiness filter counts states, not
+   * facilities) passes it here rather than starting a second row.
+   */
+  children?: React.ReactNode;
   className?: string;
 }
 
@@ -46,7 +53,7 @@ const GEOGRAPHY_LABELS: Record<string, string> = { rural: 'Rural', urban: 'Urban
  * 150px of dead space beside it and every filter takes a whole row, which is
  * five rows before the reader reaches the page.
  */
-export function FilterBar({ facilities, show = DEFAULT_KEYS, className }: FilterBarProps) {
+export function FilterBar({ facilities, show = DEFAULT_KEYS, children, className }: FilterBarProps) {
   const filters = useFilterStore();
   const visible = new Set(show);
 
@@ -184,6 +191,8 @@ export function FilterBar({ facilities, show = DEFAULT_KEYS, className }: Filter
           </div>
         </div>
       )}
+
+      {children}
 
       {active && (
         <button

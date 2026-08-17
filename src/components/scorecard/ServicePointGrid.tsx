@@ -1,7 +1,5 @@
 import { Laptop, MonitorX, Users } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import { BAND_CLASSES } from '@/lib/bands';
-import { toBand } from '@/lib/bands';
 import { SERVICE_POINTS } from '@/lib/constants';
 import { titleCaseName } from '@/lib/format';
 import type { ServicePoint } from '@/lib/types';
@@ -9,14 +7,6 @@ import type { ServicePoint } from '@/lib/types';
 const SERVICE_POINT_LABEL: Record<string, string> = Object.fromEntries(
   SERVICE_POINTS.map((p) => [p.id, p.label]),
 );
-
-const SCORE_LABEL: Record<keyof ServicePoint['scores'], string> = {
-  device: 'Device',
-  digitalSkills: 'Digital skills',
-  infrastructure: 'Infrastructure',
-  actionPlan: 'Action plan',
-  sharedStaff: 'Staffing',
-};
 
 export interface ServicePointGridProps {
   servicePoints: ServicePoint[];
@@ -29,6 +19,11 @@ export interface ServicePointGridProps {
  * renders as a card — reading "not present" — rather than disappearing, so the
  * grid is always five cells and an absent point is never mistaken for missing
  * data.
+ *
+ * Descriptive only — no per-point score. The v2 scoring methodology folded the
+ * old per-point device/digital-skills/infrastructure/action-plan/shared-staff
+ * indicators into facility-wide Workflow and Technical Infrastructure
+ * indicators, so there is no longer a column to read a per-point score from.
  */
 export function ServicePointGrid({ servicePoints, className }: ServicePointGridProps) {
   return (
@@ -81,37 +76,12 @@ function ServicePointCard({ point }: { point: ServicePoint }) {
       </div>
 
       {(point.hasDuplicateDocumentation || point.hasHybridDocumentation || point.hasBottleneck) && (
-        <div className="flex flex-wrap gap-1.5">
+        <div className="mt-auto flex flex-wrap gap-1.5 border-t border-border pt-3">
           {point.hasDuplicateDocumentation && <Flag label="Duplicate records" />}
           {point.hasHybridDocumentation && <Flag label="Hybrid documentation" />}
           {point.hasBottleneck && <Flag label="Workflow bottleneck" />}
         </div>
       )}
-
-      <div className="mt-auto flex flex-wrap gap-1.5 border-t border-border pt-3">
-        {(Object.keys(SCORE_LABEL) as (keyof ServicePoint['scores'])[]).map((key) => {
-          const score = point.scores[key];
-          const band = toBand(score);
-          return (
-            <span
-              key={key}
-              title={`${SCORE_LABEL[key]}: ${score ?? 'not assessed'}`}
-              className={cn(
-                'inline-flex items-baseline gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium',
-                band ? cn(BAND_CLASSES[band].wash, BAND_CLASSES[band].text) : 'bg-muted text-muted-foreground',
-              )}
-            >
-              {SCORE_LABEL[key]}
-              {/* The chip's tint was the only thing carrying the band, and the
-                  label names the measure rather than the result. The score
-                  itself says both, and is what someone acting on the card
-                  actually wants — an em dash where it was never assessed, which
-                  is not a zero. */}
-              <span className="font-semibold tabular-nums">{score ?? '—'}</span>
-            </span>
-          );
-        })}
-      </div>
     </div>
   );
 }

@@ -32,7 +32,9 @@ export function filterFacilities(
     if (f.functionalityLevels.length && !f.functionalityLevels.includes(fac.functionalityLevel)) {
       return false;
     }
-    if (f.archetypes.length && !f.archetypes.includes(fac.archetype)) return false;
+    if (f.archetypes.length && (!fac.archetype || !f.archetypes.includes(fac.archetype))) {
+      return false;
+    }
 
     if (f.funding.length) {
       const label = fac.isBHCPF ? 'BHCPF' : 'non-BHCPF';
