@@ -1,7 +1,16 @@
 import { useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, FileSpreadsheet, Table2 } from 'lucide-react';
+import {
+  ArrowDown,
+  ArrowUp,
+  BarChart3,
+  FileSpreadsheet,
+  FlipHorizontal2,
+  Layers3,
+  Table2,
+} from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { BAND_LABEL } from '@/lib/bands';
+import { StateReadinessBar, type BarOrientation } from '@/components/charts';
 import { ExportMenu } from '@/components/ui';
 import {
   exportCSV,
@@ -11,7 +20,7 @@ import {
   type ExportRow,
 } from '@/lib/export';
 import { useFilterStore } from '@/store/filterStore';
-import { formatCount, formatScore, percentOf } from '@/lib/format';
+import { formatCount, formatScore, formatShare } from '@/lib/format';
 import type { Band, FacilitySummary } from '@/lib/types';
 
 interface StateRow {
@@ -22,6 +31,17 @@ interface StateRow {
 }
 
 type SortKey = 'state' | 'total' | 'averageScore' | 'ready' | 'moderately_ready' | 'not_ready';
+
+/** The three ways this section can render the same rows. */
+type View = 'table' | 'clustered' | 'stacked';
+
+const VIEWS: { id: View; label: string; icon: typeof Table2 }[] = [
+  { id: 'table', label: 'Table', icon: Table2 },
+  // Stacked first: it is the closer reading of the table it replaces — one bar
+  // per state, split the way the row is split. Clustered is the comparison view.
+  { id: 'stacked', label: 'Stacked bars', icon: Layers3 },
+  { id: 'clustered', label: 'Clustered bars', icon: BarChart3 },
+];
 
 function buildRows(facilities: FacilitySummary[]): StateRow[] {
   const byState = new Map<string, FacilitySummary[]>();
@@ -59,6 +79,13 @@ function buildRows(facilities: FacilitySummary[]): StateRow[] {
  * the KPI row above it. Clicking a row scopes the whole page to that state —
  * the same one-click drill the cascading location filter offers, just from
  * the table instead of a dropdown.
+ *
+ * Three views over one set of rows: the table, clustered bars (compare one
+ * band across states) and stacked bars (compare the composition of a state).
+ * Sort, selection and export are deliberately shared rather than duplicated
+ * per view — the chart inherits the ranking the table's headers set, clicking
+ * a bar scopes the page exactly as clicking a row does, and the export always
+ * carries the same rows in the same order whichever view is on screen.
  */
 export function RankedStateTable({
   facilities,
@@ -70,6 +97,8 @@ export function RankedStateTable({
 }) {
   const [sortKey, setSortKey] = useState<SortKey>('total');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [view, setView] = useState<View>('table');
+  const [orientation, setOrientation] = useState<BarOrientation>('horizontal');
   const selectedStates = useFilterStore((s) => s.states);
   const setStates = useFilterStore((s) => s.setStates);
 
@@ -157,10 +186,104 @@ export function RankedStateTable({
 
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
-        <ExportMenu groups={exportGroups} />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {/* A group of `aria-pressed` buttons rather than a radiogroup: these
+            switch how the section is drawn, they do not set a value on a form. */}
+        <div
+          role="group"
+          aria-label="Readiness by state view"
+          className="inline-flex rounded-lg border border-border p-0.5"
+        >
+          {VIEWS.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setView(id)}
+              aria-pressed={view === id}
+              title={label}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                view === id
+                  ? 'bg-brand-50 text-brand-700'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              <Icon className="h-3.5 w-3.5" aria-hidden />
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* The chart has no column headers to click, so the sort the table
+              exposes through them needs its own control in the other two
+              views — otherwise switching to a chart silently freezes the
+              ranking wherever the table last left it. */}
+          {view !== 'table' && (
+            <button
+              type="button"
+              onClick={() =>
+                setOrientation((o) => (o === 'horizontal' ? 'vertical' : 'horizontal'))
+              }
+              aria-pressed={orientation === 'vertical'}
+              title={
+                orientation === 'horizontal'
+                  ? 'Switch to states along the bottom'
+                  : 'Switch to states down the side'
+              }
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1 text-xs font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                orientation === 'vertical'
+                  ? 'bg-brand-50 text-brand-700'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              <FlipHorizontal2 className="h-3.5 w-3.5" aria-hidden />
+              Swap axes
+            </button>
+          )}
+
+          {view !== 'table' && (
+            <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              Sort by
+              <select
+                value={sortKey}
+                onChange={(e) => setSortKey(e.target.value as SortKey)}
+                className="rounded-md border border-border bg-surface px-2 py-1 text-xs text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              >
+                {columns.map((col) => (
+                  <option key={col.key} value={col.key}>
+                    {col.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
+                aria-label={`Sort ${sortDir === 'asc' ? 'descending' : 'ascending'}`}
+                className="rounded-md border border-border p-1 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              >
+                {sortDir === 'asc' ? (
+                  <ArrowUp className="h-3.5 w-3.5" aria-hidden />
+                ) : (
+                  <ArrowDown className="h-3.5 w-3.5" aria-hidden />
+                )}
+              </button>
+            </label>
+          )}
+          <ExportMenu groups={exportGroups} />
+        </div>
       </div>
 
+      {view !== 'table' ? (
+        <StateReadinessBar
+          rows={rows}
+          mode={view}
+          orientation={orientation}
+          selectedState={selectedStates.length === 1 ? selectedStates[0] : null}
+          onSelectState={toggleState}
+        />
+      ) : (
       <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
@@ -227,19 +350,19 @@ export function RankedStateTable({
                 <td className="py-2.5 text-right tabular-nums text-ready">
                   {formatCount(row.distribution.ready)}
                   <span className="ml-1 text-xs text-muted-foreground">
-                    {percentOf(row.distribution.ready, row.total)}
+                    {formatShare(row.distribution.ready, row.total)}
                   </span>
                 </td>
                 <td className="py-2.5 text-right tabular-nums text-moderate">
                   {formatCount(row.distribution.moderately_ready)}
                   <span className="ml-1 text-xs text-muted-foreground">
-                    {percentOf(row.distribution.moderately_ready, row.total)}
+                    {formatShare(row.distribution.moderately_ready, row.total)}
                   </span>
                 </td>
                 <td className="py-2.5 text-right tabular-nums text-notready">
                   {formatCount(row.distribution.not_ready)}
                   <span className="ml-1 text-xs text-muted-foreground">
-                    {percentOf(row.distribution.not_ready, row.total)}
+                    {formatShare(row.distribution.not_ready, row.total)}
                   </span>
                 </td>
               </tr>
@@ -248,6 +371,7 @@ export function RankedStateTable({
         </tbody>
       </table>
       </div>
+      )}
     </div>
   );
 }

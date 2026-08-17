@@ -211,6 +211,72 @@ export const MATURITY_BANDS: readonly {
   { level: 'optimized', label: 'Optimized', min: 4.6, max: 5.0 },
 ] as const;
 
+/** Ascending, worst to best — the order the ramp is read in. */
+export const MATURITY_LEVELS: readonly MaturityLevel[] = MATURITY_BANDS.map((b) => b.level);
+
+export const MATURITY_LABEL: Record<MaturityLevel, string> = Object.fromEntries(
+  MATURITY_BANDS.map((b) => [b.level, b.label]),
+) as Record<MaturityLevel, string>;
+
+/**
+ * The maturity ramp — a traffic light across five steps.
+ *
+ * Where a surface reports a *level* rather than a readiness band, it is coloured
+ * from here: red for Nascent, orange for Emerging, yellow for Developing, light
+ * green for Institutionalized, dark green for Optimized. Client direction, and
+ * it earns its place — a domain score of 4.6 and one of 4.0 are both "Ready" on
+ * the three-band scale, and this is the scale that separates them.
+ *
+ * The two scales coexist rather than compete: `BAND_*` above stays the
+ * vocabulary for readiness (what to do about a facility), and this is the
+ * vocabulary for maturity (how far along a domain is). Nothing reads both about
+ * the same figure at the same time.
+ */
+export const MATURITY_CSS_VAR: Record<MaturityLevel, string> = {
+  nascent: '--maturity-nascent',
+  emerging: '--maturity-emerging',
+  developing: '--maturity-developing',
+  institutionalized: '--maturity-institutionalized',
+  optimized: '--maturity-optimized',
+};
+
+/** Tailwind class fragments per level, mirroring `BAND_CLASSES`. */
+export const MATURITY_CLASSES: Record<MaturityLevel, { text: string; bg: string; wash: string }> = {
+  nascent: {
+    text: 'text-maturity-nascent',
+    bg: 'bg-maturity-nascent',
+    wash: 'bg-maturity-nascent-wash',
+  },
+  emerging: {
+    text: 'text-maturity-emerging',
+    bg: 'bg-maturity-emerging',
+    wash: 'bg-maturity-emerging-wash',
+  },
+  developing: {
+    text: 'text-maturity-developing',
+    bg: 'bg-maturity-developing',
+    wash: 'bg-maturity-developing-wash',
+  },
+  institutionalized: {
+    text: 'text-maturity-institutionalized',
+    bg: 'bg-maturity-institutionalized',
+    wash: 'bg-maturity-institutionalized-wash',
+  },
+  optimized: {
+    text: 'text-maturity-optimized',
+    bg: 'bg-maturity-optimized',
+    wash: 'bg-maturity-optimized-wash',
+  },
+};
+
+/** Resolve a level to its live colour, reading the variable at call time so the
+ *  value tracks light/dark. Canvas only — HTML uses `MATURITY_CLASSES`. */
+export function maturityColor(level: MaturityLevel | null, el?: HTMLElement): string {
+  const root = el ?? document.documentElement;
+  const name = level ? MATURITY_CSS_VAR[level] : '--no-data';
+  return `hsl(${getComputedStyle(root).getPropertyValue(name).trim()})`;
+}
+
 /**
  * Note the deck's bands are not uniform — Institutionalized spans 0.5 where
  * the others span 0.9/0.4 — so this is a table lookup, not arithmetic.

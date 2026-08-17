@@ -1,5 +1,11 @@
 import { Check, CircleSlash, Minus } from 'lucide-react';
-import { BAND_CLASSES, BAND_LABEL, toBand, toMaturityLevel } from '@/lib/bands';
+import {
+  BAND_CLASSES,
+  BAND_LABEL,
+  MATURITY_CLASSES,
+  MATURITY_LABEL,
+  toMaturityLevel,
+} from '@/lib/bands';
 import { cn } from '@/lib/cn';
 import type { Band } from '@/lib/types';
 
@@ -92,14 +98,6 @@ export function BandBadge({
   );
 }
 
-const MATURITY_LABEL: Record<string, string> = {
-  nascent: 'Nascent',
-  emerging: 'Emerging',
-  developing: 'Developing',
-  institutionalized: 'Institutionalized',
-  optimized: 'Optimized',
-};
-
 interface MaturityBadgeProps {
   score: number | null;
   size?: 'sm' | 'md';
@@ -116,11 +114,14 @@ interface MaturityBadgeProps {
  * had recommended dropping the five-band label everywhere. The client's
  * direction is to keep it exactly where the Figma shows it.
  *
- * Coloured by the same three-band mapping as everything else (`toBand`),
- * not a fifth palette — the Figma's own mock colours don't consistently
- * track its five-band labels (e.g. two different "Developing" domains are
- * shown in two different colours), which the build guide already flagged as
- * illustrative/inconsistent mock data, not a scheme to reproduce literally.
+ * Coloured on the five-level ramp in `MATURITY_CLASSES` — red at Nascent
+ * through to dark green at Optimized — so the pill agrees with the score ring
+ * it sits under. It used to borrow the three readiness colours, which meant a
+ * badge reading "Institutionalized" and one reading "Optimized" came out the
+ * same green: the finer label was there without the finer scale behind it.
+ *
+ * This is not the readiness scale and does not replace it. A facility's overall
+ * archetype pill stays on `BandBadge`'s three colours.
  */
 export function MaturityBadge({ score, size = 'md', className }: MaturityBadgeProps) {
   const level = toMaturityLevel(score);
@@ -138,8 +139,7 @@ export function MaturityBadge({ score, size = 'md', className }: MaturityBadgePr
     );
   }
 
-  const band = toBand(score) as Band;
-  const classes = BAND_CLASSES[band];
+  const classes = MATURITY_CLASSES[level];
 
   return (
     <span

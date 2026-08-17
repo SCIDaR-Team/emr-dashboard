@@ -249,8 +249,15 @@ export default function FacilityScorecardPage() {
               </p>
             </div>
 
-            {/* One column per scored theme */}
-            <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-4">
+            {/* One column per scored theme.
+                The four cards in a column are laid on the *parent* grid's rows
+                rather than stacked inside it — `grid-rows-subgrid` below — so
+                every column's Score, Minimum requirements and Investments cards
+                share a row and end at the same height. Stacked independently,
+                a theme with two investments left its card short beside a
+                neighbour with four, and the ragged bottom edge read as a
+                difference in the data rather than in the item count. */}
+            <div className="grid auto-rows-auto gap-4 lg:grid-cols-2 2xl:grid-cols-4">
               {FACILITY_THEMES.map((theme) => {
                 const themeScore = facility.themeScores.find((t) => t.themeId === theme.id);
                 const Icon = THEME_ICONS[theme.icon];
@@ -263,7 +270,10 @@ export default function FacilityScorecardPage() {
                 const investments = facility.investments.filter((i) => i.themeId === theme.id);
 
                 return (
-                  <div key={theme.id} className="space-y-4">
+                  <div
+                    key={theme.id}
+                    className="grid grid-rows-subgrid gap-4 [grid-row:span_4]"
+                  >
                     <h2 className="flex items-center gap-2 text-base font-semibold text-brand-700">
                       {Icon && <Icon className="h-4 w-4" aria-hidden />}
                       {theme.label}
@@ -271,7 +281,6 @@ export default function FacilityScorecardPage() {
                     <SectionCard title="Score" bodyClassName="grid place-items-center gap-3 py-6">
                       <DomainDonut
                         score={themeScore?.score ?? null}
-                        band={themeScore?.band ?? null}
                         ariaLabel={`${theme.label} score, ${formatScore(themeScore?.score ?? null)} of 5`}
                       />
                       {/* Five-band maturity label here — the Figma's own

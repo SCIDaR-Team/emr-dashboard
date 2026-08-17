@@ -50,6 +50,24 @@ export default {
           wash: 'hsl(var(--not-ready-wash) / <alpha-value>)',
         },
         nodata: 'hsl(var(--no-data) / <alpha-value>)',
+
+        // The five-level maturity ramp (Nascent → Optimized). A finer scale
+        // than the three readiness bands above, for the surfaces that report a
+        // maturity level. Reach it through MATURITY_CLASSES / maturityColor()
+        // in src/lib/bands.ts rather than naming a step directly.
+        maturity: {
+          nascent: 'hsl(var(--maturity-nascent) / <alpha-value>)',
+          'nascent-wash': 'hsl(var(--maturity-nascent-wash) / <alpha-value>)',
+          emerging: 'hsl(var(--maturity-emerging) / <alpha-value>)',
+          'emerging-wash': 'hsl(var(--maturity-emerging-wash) / <alpha-value>)',
+          developing: 'hsl(var(--maturity-developing) / <alpha-value>)',
+          'developing-wash': 'hsl(var(--maturity-developing-wash) / <alpha-value>)',
+          institutionalized: 'hsl(var(--maturity-institutionalized) / <alpha-value>)',
+          'institutionalized-wash':
+            'hsl(var(--maturity-institutionalized-wash) / <alpha-value>)',
+          optimized: 'hsl(var(--maturity-optimized) / <alpha-value>)',
+          'optimized-wash': 'hsl(var(--maturity-optimized-wash) / <alpha-value>)',
+        },
       },
       borderRadius: {
         card: 'var(--radius-card)',

@@ -150,6 +150,11 @@ export default function AssessmentStatesPage() {
           <div className="flex flex-wrap items-center gap-8">
             <ArchetypeDonut
               distribution={metrics.distribution}
+              // The three cards beside the ring already name every band with its
+              // count and share, so the ring's own dot legend would say it twice.
+              // Its arcs carry the figures outside them either way.
+              showLegend={false}
+              className="w-full max-w-[340px] shrink-0 sm:w-auto sm:flex-1"
               ariaLabel={`Archetype split: ${formatCount(metrics.distribution.ready)} ready, ${formatCount(metrics.distribution.moderately_ready)} moderately ready, ${formatCount(metrics.distribution.not_ready)} not ready`}
             />
             <div className="grid flex-1 gap-3 sm:grid-cols-3">
@@ -181,7 +186,7 @@ export default function AssessmentStatesPage() {
 
         <SectionCard
           title="Readiness by state"
-          subtitle="Facilities assessed and archetype split per state — click a row to scope the page"
+          subtitle="Facilities assessed and archetype split per state — switch between table and bar views; click a row or bar to scope the page"
         >
           {facilities.length === 0 ? (
             // Distinct from the page-level empty state above: the data loaded

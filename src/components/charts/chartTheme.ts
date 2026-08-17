@@ -8,8 +8,8 @@
  */
 
 import { useThemeStore } from '@/store/themeStore';
-import { BAND_CSS_VAR, BAND_TEXTURE } from '@/lib/bands';
-import type { Band } from '@/lib/types';
+import { BAND_CSS_VAR, BAND_TEXTURE, MATURITY_CSS_VAR } from '@/lib/bands';
+import type { Band, MaturityLevel } from '@/lib/types';
 
 /**
  * Resolve a CSS custom property to a colour string.
@@ -36,6 +36,8 @@ export interface ChartTheme {
   noData: string;
   /** The three readiness colours, in ascending order. */
   bands: Record<Band, string>;
+  /** The five-level maturity ramp, red through green. See `MATURITY_CSS_VAR`. */
+  maturity: Record<MaturityLevel, string>;
   /**
    * Categorical series colours, for the rare chart that is not about readiness.
    * Anything showing Ready / Moderately ready / Not ready must use `bands`
@@ -65,6 +67,13 @@ export function useChartTheme(): ChartTheme {
       not_ready: cssVar(BAND_CSS_VAR.not_ready),
       moderately_ready: cssVar(BAND_CSS_VAR.moderately_ready),
       ready: cssVar(BAND_CSS_VAR.ready),
+    },
+    maturity: {
+      nascent: cssVar(MATURITY_CSS_VAR.nascent),
+      emerging: cssVar(MATURITY_CSS_VAR.emerging),
+      developing: cssVar(MATURITY_CSS_VAR.developing),
+      institutionalized: cssVar(MATURITY_CSS_VAR.institutionalized),
+      optimized: cssVar(MATURITY_CSS_VAR.optimized),
     },
     palette: [
       cssVar('--brand-500'),
