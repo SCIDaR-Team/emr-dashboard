@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
-import { AlertTriangle, Download } from 'lucide-react';
+import { useMemo } from 'react';
+import { AlertTriangle, ArrowLeft, Download, X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/layout/PageHeader';
 import {
   LoadError,
@@ -9,6 +10,10 @@ import {
   TileRow,
 } from '@/components/ui';
 import { useDataContext } from '@/state/dataContext';
+import { useFilterStore } from '@/store/filterStore';
+import { useScopeFromNavigation } from '@/app/scopeNavigation';
+import { useInvestmentRateStore } from '@/store/investmentRateStore';
+import { aggregateAreaProfiles } from '@/lib/areaProfile';
 import { cn } from '@/lib/cn';
 import { formatCount, formatNaira, formatScore } from '@/lib/format';
 import { THEMES, THEME_BY_ID } from '@/lib/themes';
@@ -36,11 +41,50 @@ const PRIORITY_RANK: Record<string, number> = { high: 0, medium: 1, low: 2 };
  * rates exist. The placeholder rates are opt-in and loudly labelled.
  */
 export default function InvestmentPlanPage() {
-  const { national } = useDataContext();
-  const profile = national.data;
+  const { national, states } = useDataContext();
+  const navigate = useNavigate();
+  const selectedStates = useFilterStore((s) => s.states);
+  const setStates = useFilterStore((s) => s.setStates);
 
-  const [entered, setEntered] = useState<Record<string, string>>({});
-  const [illustrative, setIllustrative] = useState(false);
+  // Arriving from a state row in National Coverage's investment table scopes
+  // the whole costed plan to that state.
+  useScopeFromNavigation();
+
+  // Rates live in a store, not local state, so the cost column on National
+  // Coverage and the schedule here are always quoting the same figures.
+  const entered = useInvestmentRateStore((s) => s.entered);
+  const illustrative = useInvestmentRateStore((s) => s.illustrative);
+  const setEntered = useInvestmentRateStore((s) => s.setEntered);
+  const clearEntered = useInvestmentRateStore((s) => s.clearEntered);
+  const setIllustrative = useInvestmentRateStore((s) => s.setIllustrative);
+
+  /**
+   * The states in scope, if any. Arriving from a state row on National
+   * Coverage scopes the whole plan to that state — the row was a question
+   * about *that* state's bill, and answering it with the national schedule
+   * would lose the question on the way over.
+   */
+  const scopedStates = useMemo(
+    () =>
+      states.data.filter(
+        (s) => s.evidenceGrade === 'primary' && selectedStates.includes(s.name),
+      ),
+    [states.data, selectedStates],
+  );
+
+  const scopeLabel =
+    scopedStates.length === 0
+      ? null
+      : scopedStates.length === 1
+        ? scopedStates[0]!.name
+        : `${scopedStates.length} states`;
+
+  const profile = useMemo(() => {
+    if (scopedStates.length === 0) return national.data;
+    if (scopedStates.length === 1) return scopedStates[0]!;
+    return aggregateAreaProfiles(scopedStates);
+  }, [scopedStates, national.data]);
+
   const ctx: RateContext = useMemo(
     () => ({ entered, illustrative }),
     [entered, illustrative],
@@ -77,13 +121,47 @@ export default function InvestmentPlanPage() {
   if (!profile) return <LoadError what="the investment schedule" />;
 
   const highPriority = items.filter((i) => i.priority === 'high').length;
+
+  // Leadership is the weakest domain nationally, but not in every state — Kano
+  // is weaker on Technical Infrastructure. The claim is checked against the
+  // scope in view rather than asserted, because the point of the note survives
+  // without it: a domain with no costed line is a hole whatever it scores.
+  const leadershipScore = profile.themeScores.leadership_governance;
+  const leadershipIsWeakest =
+    leadershipScore != null &&
+    THEMES.every((t) => {
+      const other = profile.themeScores[t.id];
+      return t.id === 'leadership_governance' || other == null || other >= leadershipScore;
+    });
   const notReady = profile.facilityCount - (profile.archetypeDistribution.ready ?? 0);
 
   return (
     <>
       <PageHeader
         title="Investment Plan"
-        subtitle="What it will take, itemised and costed"
+        subtitle={
+          scopeLabel
+            ? `${scopeLabel} — itemised and costed`
+            : 'What it will take, itemised and costed'
+        }
+        // The costed plan is reached both from the rail (nationally) and by
+        // drilling a state row on National Coverage, so the way back up the
+        // hierarchy is always present and always drops the scope with it —
+        // National Coverage is national, and a state carried into it would be
+        // an invisible filter on a page with no control to undo it.
+        back={
+          <button
+            type="button"
+            onClick={() => {
+              setStates([]);
+              navigate('/states');
+            }}
+            className="mono -ml-1 inline-flex shrink-0 items-center gap-1 rounded px-1 py-0.5 text-[10px] uppercase tracking-[0.1em] text-muted-foreground transition-colors hover:text-brand-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          >
+            <ArrowLeft className="h-3 w-3" aria-hidden />
+            National
+          </button>
+        }
         actions={
           <button
             type="button"
@@ -95,6 +173,26 @@ export default function InvestmentPlanPage() {
       />
 
       <div className="space-y-4 p-4 sm:p-5">
+        {/* The scope has no filter control on this page, so it says so itself
+            and offers its own way out — otherwise a state-scoped schedule is
+            indistinguishable from the national one at a glance. */}
+        {scopeLabel && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-muted-foreground">Scoped to:</span>
+            <button
+              type="button"
+              onClick={() => setStates([])}
+              className="inline-flex items-center gap-1.5 rounded-full border border-brand-500/30 bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-600 transition-colors hover:border-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            >
+              {scopedStates.map((s) => s.name).join(', ')}
+              <X size={12} aria-hidden />
+            </button>
+            <span className="mono text-[10.5px] text-muted-foreground">
+              clear to see the national plan
+            </span>
+          </div>
+        )}
+
         {showWarning && (
           <div
             role="note"
@@ -148,10 +246,18 @@ export default function InvestmentPlanPage() {
           />
         </TileRow>
 
-        <div className="grid items-start gap-4 xl:grid-cols-2">
+        {/* Held to one height (grid `stretch`), each body a flex column with its
+            closing block pushed down by `mt-auto`. The two cards draw the same
+            five domains but not the same trailing content — a note on one side,
+            a caption or an empty-state prompt on the other — so their natural
+            heights never match, and the cost card's "no rates yet" state is far
+            shorter than the item bars beside it. */}
+        <div className="grid gap-4 xl:grid-cols-2">
           <SectionCard
             title="Items by domain"
             subtitle={`${formatCount(totals.quantity)} units across ${items.length} actions`}
+            className="flex flex-col"
+            bodyClassName="flex flex-1 flex-col"
           >
             <div className="space-y-2.5">
               {THEMES.map((theme) => {
@@ -180,7 +286,7 @@ export default function InvestmentPlanPage() {
               })}
             </div>
 
-            <div className="mt-4 border-l-2 border-brand-500 pl-4">
+            <div className="mt-auto border-l-2 border-brand-500 pl-4 pt-4">
               <p className="mono mb-1 text-[10px] uppercase tracking-[0.12em] text-brand-500">
                 The hole in the plan
               </p>
@@ -188,10 +294,12 @@ export default function InvestmentPlanPage() {
                 <strong className="font-semibold text-foreground">
                   Leadership &amp; Governance carries zero costed items
                 </strong>{' '}
-                while scoring {formatScore(profile.themeScores.leadership_governance, 2)} —
-                the weakest domain nationally. It is measured at state level and the
-                instrument only triggers actions at facility level, so the weakest domain
-                has no line to fund.
+                while scoring {formatScore(profile.themeScores.leadership_governance, 2)}
+                {leadershipIsWeakest
+                  ? ` — the weakest domain ${scopeLabel ? `in ${scopeLabel}` : 'nationally'}`
+                  : ''}
+                . It is measured at state level and the instrument only triggers actions at
+                facility level, so it has no line to fund whatever it scores.
               </p>
             </div>
           </SectionCard>
@@ -205,6 +313,8 @@ export default function InvestmentPlanPage() {
                   ? 'entered rates'
                   : 'awaiting rates'
             }
+            className="flex flex-col"
+            bodyClassName="flex flex-1 flex-col"
           >
             {totals.grand ? (
               <>
@@ -233,14 +343,16 @@ export default function InvestmentPlanPage() {
                     );
                   })}
                 </div>
-                <p className="mono mt-3 text-[10.5px] leading-relaxed text-muted-foreground">
+                <p className="mono mt-auto pt-3 text-[10.5px] leading-relaxed text-muted-foreground">
                   Share of spend is not share of items — the heaviest unit rates sit on power
                   and devices, so Technical Infrastructure takes a larger slice of cost than
                   of volume.
                 </p>
               </>
             ) : (
-              <div className="py-8 text-center">
+              // Centred in whatever height the card is held to, rather than
+              // pinned to the top with the rest of the card empty beneath it.
+              <div className="flex flex-1 flex-col items-center justify-center py-8 text-center">
                 <p className="text-sm font-semibold text-foreground">No rates entered yet</p>
                 <p className="mx-auto mt-1.5 max-w-[42ch] text-[13px] text-muted-foreground">
                   The source data has no unit costs, so this panel has nothing to total. Enter
@@ -299,7 +411,7 @@ export default function InvestmentPlanPage() {
             {Object.keys(entered).length > 0 && (
               <button
                 type="button"
-                onClick={() => setEntered({})}
+                onClick={clearEntered}
                 className="mono text-[10px] uppercase tracking-[0.08em] text-brand-500 hover:text-brand-600"
               >
                 Clear my entries ({Object.keys(entered).length})
@@ -353,12 +465,14 @@ export default function InvestmentPlanPage() {
                       pricedRows={sub?.priced ?? 0}
                       quantity={sub?.quantity ?? 0}
                       onRate={(id, value) =>
-                        setEntered((prev) => {
-                          const next = { ...prev };
-                          if (value === '') delete next[id];
-                          else next[id] = value;
-                          return next;
-                        })
+                        setEntered(
+                          (() => {
+                            const next = { ...entered };
+                            if (value === '') delete next[id];
+                            else next[id] = value;
+                            return next;
+                          })(),
+                        )
                       }
                     />
                   );

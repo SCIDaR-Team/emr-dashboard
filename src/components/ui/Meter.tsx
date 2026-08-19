@@ -159,12 +159,31 @@ export function ScoreRow({
   );
 }
 
-/** The 1 / mean / 5 rule under a stack of ScoreRows. */
-export function ScoreAxis({ reference }: { reference?: number | null }) {
+/**
+ * The 1 / mean / 5 rule under a stack of ScoreRows.
+ *
+ * `referenceLabel` names what the tick actually is. It defaults to the national
+ * mean because that is what every original caller passes, but sub-theme rows
+ * are read against their own domain's mean instead — and a rule labelled
+ * "national mean" while marking something else is worse than no rule at all.
+ */
+export function ScoreAxis({
+  reference,
+  referenceLabel = 'national mean',
+}: {
+  reference?: number | null;
+  referenceLabel?: string;
+}) {
   return (
     <div className="mono mt-2.5 flex justify-between border-t border-border pt-2 text-[9.5px] tracking-wider text-muted-foreground">
       <span>1</span>
-      {reference != null ? <span>national mean {formatScore(reference)} │</span> : <span>3</span>}
+      {reference != null ? (
+        <span>
+          {referenceLabel} {formatScore(reference, 2)} │
+        </span>
+      ) : (
+        <span>3</span>
+      )}
       <span>5</span>
     </div>
   );

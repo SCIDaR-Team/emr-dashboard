@@ -1,7 +1,9 @@
-import { useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { useCallback, useEffect, useMemo } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { RankedStatesTable } from './RankedStatesTable';
-import { CheckCircle2, CircleSlash, MinusCircle } from 'lucide-react';
+import { InvestmentByStateTable } from './InvestmentByStateTable';
+import { RolloutWaves } from './RolloutWaves';
+import { CheckCircle2, CircleSlash, MinusCircle, MousePointerClick } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import {
   EmptyState,
@@ -17,14 +19,14 @@ import { FilterBar } from '@/components/filters/FilterBar';
 import { NigeriaChoropleth, type GeoDatum } from '@/components/map';
 import { useDataContext } from '@/state/dataContext';
 import { useFilterStore } from '@/store/filterStore';
+import { drillIntoState as navigateScoped } from '@/app/scopeNavigation';
 import { aggregateAreaProfiles } from '@/lib/areaProfile';
 import { BAND_LABEL } from '@/lib/bands';
 import { COVERAGE } from '@/lib/constants';
-import { RoadmapMatrix } from '@/components/scorecard';
 import { buildShareMap } from '@/lib/scale';
 import { formatCount, formatScore } from '@/lib/format';
 import { THEMES } from '@/lib/themes';
-import type { Band } from '@/lib/types';
+import type { AreaProfile, Band } from '@/lib/types';
 
 const BAND_ORDER: Band[] = ['ready', 'moderately_ready', 'not_ready'];
 const BAND_ICON: Record<Band, typeof CheckCircle2> = {
@@ -34,59 +36,119 @@ const BAND_ICON: Record<Band, typeof CheckCircle2> = {
 };
 
 /**
- * Module 2 — State Summary.
+ * Module 2 — National Coverage.
  *
  * Readiness across all 37 states: a national choropleth, five-domain scores
- * (the only module where Leadership & Governance appears), investment by
- * theme, and the 6-month roadmap. Real for what the data actually covers —
- * the 12 primary states plus a partial (4 of 14 rubric questions) Leadership
- * score for them — and explicit about what still isn't: any finding for the
- * 25 secondary states, and every cost figure (guide §17.1, §17.4).
+ * (the only module where Leadership & Governance appears), investment by state,
+ * and the order the states should be worked in. Real for what the data actually
+ * covers — the 12 primary states plus a partial (4 of 14 rubric questions)
+ * Leadership score for them — and explicit about what still isn't: any finding
+ * for the 25 secondary states, and every cost figure (guide §17.1, §17.4).
+ *
+ * Everything here reads at the national level, and the page is built so that it
+ * cannot quietly stop doing so. There is no State filter: a single state's
+ * detail is Assessed States' job, and the map is the way through to it. Scope is
+ * cut by zone instead, which is a national way of slicing the country rather
+ * than a way of leaving it.
  */
 export default function StateSummaryPage() {
   const { states, national, facilities: facilitiesFetch } = useDataContext();
-  const selectedStates = useFilterStore((s) => s.states);
+  const navigate = useNavigate();
+  const zoneFilter = useFilterStore((s) => s.zones);
   const bandFilter = useFilterStore((s) => s.archetypes);
   const setBandFilter = useFilterStore((s) => s.setArchetypes);
+  const setStates = useFilterStore((s) => s.setStates);
+
+  // Filter state is global and persisted, so a state scope set on Assessed
+  // States would otherwise follow the user here and silently narrow a page that
+  // no longer has a control to undo it — the figures would read as national and
+  // be one state's. Arriving here *is* the act of going back to national, so the
+  // scope is dropped on the way in. (`setStates` clears LGAs with it.)
+  useEffect(() => {
+    if (useFilterStore.getState().states.length) setStates([]);
+  }, [setStates]);
+
+  /** Everything in the selected zones — assessed or desk-reviewed. */
+  const scopedStates = useMemo(
+    () =>
+      zoneFilter.length
+        ? states.data.filter((s) => s.zone && zoneFilter.includes(s.zone))
+        : states.data,
+    [states.data, zoneFilter],
+  );
 
   const primaryStates = useMemo(
-    () => states.data.filter((s) => s.evidenceGrade === 'primary'),
-    [states.data],
+    () => scopedStates.filter((s) => s.evidenceGrade === 'primary'),
+    [scopedStates],
   );
 
   // Both filters narrow the *same* population — every panel below reads off
-  // this one list, so "State: Kano" and "Readiness: Ready" combine (AND, not
-  // two independent views), and a combination that matches nothing shows
+  // this one list, so "Zone: North West" and "Readiness: Ready" combine (AND,
+  // not two independent views), and a combination that matches nothing shows
   // nothing rather than quietly falling back to the national figures.
-  const visiblePrimaryStates = useMemo(() => {
-    let visible = primaryStates;
-    if (selectedStates.length) {
-      visible = visible.filter((s) => selectedStates.includes(s.name));
-    }
-    if (bandFilter.length) {
-      visible = visible.filter((s) => s.band && bandFilter.includes(s.band));
-    }
-    return visible;
-  }, [primaryStates, selectedStates, bandFilter]);
+  const visiblePrimaryStates = useMemo(
+    () =>
+      bandFilter.length
+        ? primaryStates.filter((s) => s.band && bandFilter.includes(s.band))
+        : primaryStates,
+    [primaryStates, bandFilter],
+  );
+
+  const allPrimaryCount = useMemo(
+    () => states.data.filter((s) => s.evidenceGrade === 'primary').length,
+    [states.data],
+  );
+
+  const zoneLabel =
+    zoneFilter.length === 1 ? zoneFilter[0]! : `${zoneFilter.length} zones`;
 
   const scopeLabel =
-    visiblePrimaryStates.length === primaryStates.length
-      ? 'National'
-      : visiblePrimaryStates.length === 1
-        ? (visiblePrimaryStates[0]?.name ?? 'National')
-        : visiblePrimaryStates.length === 0
-          ? 'No states match'
+    visiblePrimaryStates.length === 0
+      ? 'No states match'
+      : visiblePrimaryStates.length === allPrimaryCount
+        ? 'National'
+        : zoneFilter.length && !bandFilter.length
+          ? zoneLabel
           : `${visiblePrimaryStates.length} states`;
 
   const scope = useMemo(() => {
     if (visiblePrimaryStates.length === 0) return null;
-    if (visiblePrimaryStates.length === primaryStates.length) return national.data;
+    if (visiblePrimaryStates.length === allPrimaryCount) return national.data;
     if (visiblePrimaryStates.length === 1) return visiblePrimaryStates[0];
     return aggregateAreaProfiles(visiblePrimaryStates);
-  }, [visiblePrimaryStates, primaryStates.length, national.data]);
+  }, [visiblePrimaryStates, allPrimaryCount, national.data]);
 
   const stateBandCounts: Record<Band, number> = { ready: 0, moderately_ready: 0, not_ready: 0 };
   for (const s of visiblePrimaryStates) if (s.band) stateBandCounts[s.band] += 1;
+
+  /**
+   * Drill into one state.
+   *
+   * The state becomes the global scope and the user lands on the module that
+   * answers the question they asked it from — Assessed States for readiness,
+   * the Investment Plan for a bill. Both scope to the state and both carry a
+   * way back up to this page.
+   */
+  // The scope rides along with the navigation and is applied by the page being
+  // opened — see `scopeNavigation.ts` for why writing it here instead cancels
+  // the route change.
+  const drillInto = useCallback(
+    (stateName: string, to: string) => navigateScoped(navigate, to, stateName),
+    [navigate],
+  );
+
+  /** The map, the ranked table and the wave chips: readiness questions. */
+  const drillIntoState = useCallback(
+    (state: AreaProfile) => drillInto(state.name, '/assessment'),
+    [drillInto],
+  );
+
+  /** The investment table: a costing question, so it lands on the costed
+   *  schedule rather than on the readiness breakdown. */
+  const drillIntoInvestment = useCallback(
+    (state: AreaProfile) => drillInto(state.name, '/investment'),
+    [drillInto],
+  );
 
   // States filtered out of scope grey out on the map (band: null reads as
   // "no data", the same visual the secondary-evidence states already use for
@@ -100,6 +162,7 @@ export default function StateSummaryPage() {
   // same states, so the sequential ramp has something to say. See
   // `buildShareMap` and the note on `GeoDatum.step`.
   const visibleIds = new Set(visiblePrimaryStates.map((s) => s.id));
+  const inZoneIds = new Set(scopedStates.map((s) => s.id));
   const shareMap = useMemo(() => buildShareMap(states.data), [states.data]);
   const polygonData = useMemo<Record<string, GeoDatum>>(
     () =>
@@ -107,14 +170,17 @@ export default function StateSummaryPage() {
         Object.entries(shareMap.data).map(([id, datum]) => [
           id,
           // Filtered-out states drop to the no-data treatment, so a filter has
-          // a visible effect on the map and not just on the tiles above it.
-          datum.evidenceGrade === 'primary' && !visibleIds.has(id)
+          // a visible effect on the map and not just on the tiles above it. A
+          // zone filter drops the desk-review states outside it too — the zone
+          // is a claim about the whole country, not just the assessed part.
+          !inZoneIds.has(id) ||
+          (datum.evidenceGrade === 'primary' && !visibleIds.has(id))
             ? { ...datum, band: null, step: null, valueLabel: undefined }
             : datum,
         ]),
       ),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- visibleIds is derived fresh each render from visiblePrimaryStates
-    [shareMap, visiblePrimaryStates],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- visibleIds/inZoneIds are derived fresh each render
+    [shareMap, visiblePrimaryStates, scopedStates],
   );
 
   const isLoading = states.isLoading || national.isLoading || facilitiesFetch.isLoading;
@@ -126,11 +192,11 @@ export default function StateSummaryPage() {
   // "Ready (110)" beside an option that will actually select from 0 states
   // is its own bug. Counts below are how many of the 12 primary states carry
   // each band, computed against the unfiltered 12 so they stay stable as the
-  // State control narrows.
+  // Zone control narrows.
   const readinessOptions = BAND_ORDER.map((band) => ({
     key: band,
     label: BAND_LABEL[band],
-    count: primaryStates.filter((s) => s.band === band).length,
+    count: states.data.filter((s) => s.evidenceGrade === 'primary' && s.band === band).length,
   }));
 
   return (
@@ -139,10 +205,11 @@ export default function StateSummaryPage() {
         title="National Coverage"
         subtitle={`All ${COVERAGE.statesTotal} states and how each was evidenced`}
       >
-        {/* Readiness is passed through FilterBar's slot rather than rendered
-            beside it: FilterBar owns the row, so a sibling control lands on a
-            second line under the State dropdown. */}
-        <FilterBar facilities={facilitiesFetch.data} show={['state']}>
+        {/* Zone, not State: this page is the national view, and a single state
+            belongs to Assessed States. Readiness is passed through FilterBar's
+            slot rather than rendered beside it — FilterBar owns the row, so a
+            sibling control lands on a second line under the dropdown. */}
+        <FilterBar facilities={facilitiesFetch.data} show={['zone']}>
           <MultiSelectDropdown
             label="Readiness"
             className="min-w-[9.5rem] flex-1 sm:w-48 sm:flex-none"
@@ -201,10 +268,19 @@ export default function StateSummaryPage() {
                     so letting it fill a full-width card would make it ~1000px
                     tall and push everything else off the fold. */}
                 <div className="mx-auto w-full max-w-3xl space-y-3">
-                  <NigeriaChoropleth
-                    data={polygonData}
-                    selectedId={visiblePrimaryStates.length === 1 ? (visiblePrimaryStates[0]?.id ?? null) : null}
-                  />
+                  {/* Above the map, not below it: an instruction read after the
+                      reader has already given up on clicking is no instruction. */}
+                  <div className="card flex items-center gap-2.5 px-3.5 py-2.5">
+                    <MousePointerClick className="h-4 w-4 shrink-0 text-brand-500" aria-hidden />
+                    <p className="text-[12.5px] text-foreground">
+                      Click any highlighted state to drill into it.
+                    </p>
+                  </div>
+
+                  <NigeriaChoropleth data={polygonData} onSelect={(id) => {
+                    const state = states.data.find((s) => s.id === id);
+                    if (state) drillInto(state.name, '/assessment');
+                  }} />
                   <ScaleLegend
                     lo={shareMap.lo}
                     hi={shareMap.hi}
@@ -263,118 +339,90 @@ export default function StateSummaryPage() {
             </SectionCard>
 
             <SectionCard
-              title="The 12 assessed states, ranked"
+              title={
+                visiblePrimaryStates.length === allPrimaryCount
+                  ? `The ${COVERAGE.statesPrimary} assessed states, ranked`
+                  : `${visiblePrimaryStates.length} assessed states, ranked`
+              }
               subtitle="composition, not average, is what a rollout plan needs"
               action={<BandLegend />}
             >
-              <RankedStatesTable states={states.data} national={national.data} />
+              <RankedStatesTable
+                states={[
+                  ...visiblePrimaryStates,
+                  ...scopedStates.filter((s) => s.evidenceGrade === 'secondary'),
+                ]}
+                national={scope ?? null}
+                onSelectState={drillIntoState}
+              />
             </SectionCard>
 
             <SectionCard
-              title="Investments required"
+              title="Investment required, by state"
               subtitle={
                 visiblePrimaryStates.length === 0
                   ? 'No states match the current filters'
-                  : scopeLabel === 'National'
-                    ? 'Itemised across all 12 assessed states'
-                    : `Itemised for ${scopeLabel}`
+                  : 'ranked by total items — quantities are real, naira is not'
               }
             >
-              {scope?.investments.length ? (
+              {visiblePrimaryStates.length === 0 ? (
+                <EmptyState
+                  title="No states match"
+                  message="Widen or clear the Zone/Readiness filters above to bring states back into scope."
+                />
+              ) : (
                 <>
-                  {/* Bars and the total sit side by side now that the card is
-                      full width — stacked, four bars stretched to 1200px read
-                      as a chart with nothing to compare against. */}
-                  <div className="mb-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
-                    <div className="space-y-3">
-                      {THEMES.filter((t) => t.facilityLevel).map((theme) => {
-                        const items = scope.investments.filter((i) => i.themeId === theme.id);
-                        const quantity = items.reduce((sum, i) => sum + i.quantity, 0);
-                        const max = Math.max(
-                          1,
-                          ...THEMES.filter((t) => t.facilityLevel).map((t) =>
-                            scope.investments
-                              .filter((i) => i.themeId === t.id)
-                              .reduce((sum, i) => sum + i.quantity, 0),
-                          ),
-                        );
-                        return (
-                          <div key={theme.id}>
-                            <div className="mb-1 flex items-center justify-between text-sm">
-                              <span className="text-foreground">{theme.label}</span>
-                              <span className="font-semibold text-brand-700">
-                                {formatCount(quantity)} items
-                              </span>
-                            </div>
-                            <div className="h-2 rounded-full bg-muted">
-                              <div
-                                className="h-2 rounded-full bg-brand-600"
-                                style={{ width: `${(quantity / max) * 100}%` }}
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    <div className="rounded-lg border border-border p-4">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        Total investment items
-                      </p>
-                      <p className="mt-1 text-2xl font-bold text-brand-700">
-                        {formatCount(scope.investments.reduce((sum, i) => sum + i.quantity, 0))}
-                      </p>
-                      <p className="text-xs italic text-muted-foreground">
-                        Naira total pending a signed-off cost table (guide §9.1, §17.4)
-                      </p>
-                    </div>
-                  </div>
+                  <InvestmentByStateTable
+                    states={visiblePrimaryStates}
+                    onSelectState={drillIntoInvestment}
+                  />
                   <p className="mono mt-4 border-t border-border pt-3 text-[10.5px] leading-relaxed text-muted-foreground">
-                    Unit and total costs, per-domain subtotals and the full{' '}
-                    {scope.investments.length}-action schedule live on the{' '}
+                    Item quantities are real — each one is an action a facility failed a
+                    minimum requirement on. Naira is not: the assessment publishes no cost
+                    table, so a cost reads &ldquo;pending&rdquo; until unit rates are entered
+                    on the{' '}
                     <Link to="/investment" className="text-brand-500 hover:text-brand-600">
                       Investment Plan
                     </Link>{' '}
-                    page.
+                    page, which is also where a state row opens its own itemised schedule
+                    (guide §9.1, §17.4).
                   </p>
                 </>
-              ) : visiblePrimaryStates.length === 0 ? (
-                <EmptyState
-                  title="No states match"
-                  message="Widen or clear the State/Readiness filters above to bring states back into scope."
-                />
-              ) : scope ? (
-                <EmptyState
-                  title="No investment needed"
-                  message="Every measured minimum requirement across this population is met."
-                />
-              ) : (
-                <EmptyState title="Loading…" />
               )}
             </SectionCard>
 
             <SectionCard
-              title="Roadmap · 6-month plan"
+              title="Rollout waves"
               subtitle={
                 scopeLabel === 'National'
-                  ? 'what each readiness band does, month by month — all 12 assessed states'
-                  : `what each readiness band does, month by month — ${scopeLabel}`
+                  ? 'the order to work the 12 assessed states in'
+                  : `the order to work these states in — ${scopeLabel}`
               }
             >
-              <RoadmapMatrix
-                distribution={
-                  scope?.archetypeDistribution ?? {
-                    ready: 0,
-                    moderately_ready: 0,
-                    not_ready: 0,
-                  }
-                }
-              />
-              <p className="mono mt-3 text-[10.5px] leading-relaxed text-muted-foreground">
-                Activities are the assessment&rsquo;s fixed 6-month plan; cost per cell awaits
-                the same signed-off cost table as every other investment figure
-                (guide §9.2, §17.4).
-              </p>
+              {visiblePrimaryStates.length === 0 ? (
+                <EmptyState
+                  title="No states to sequence"
+                  message="Widen or clear the Zone/Readiness filters above to bring states back into scope."
+                />
+              ) : (
+                <>
+                  <RolloutWaves
+                    states={visiblePrimaryStates}
+                    onSelectState={drillIntoState}
+                  />
+                  <p className="mono mt-4 border-t border-border pt-3 text-[10.5px] leading-relaxed text-muted-foreground">
+                    Derived sequencing, not a signed-off schedule. The assessment specifies
+                    one fixed 6-month activity plan per readiness band and no per-state
+                    timetable; what separates these states is the composition of their
+                    facilities, so the waves are cut on composite readiness. The activity
+                    plan itself is on the{' '}
+                    <Link to="/dashboard" className="text-brand-500 hover:text-brand-600">
+                      Overview
+                    </Link>
+                    .
+                  </p>
+                </>
+              )}
             </SectionCard>
           </div>
         )}

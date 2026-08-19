@@ -1,5 +1,4 @@
 import { ArrowRight } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { BandStack, ScoreCell } from '@/components/ui';
 import { formatCount, formatScore } from '@/lib/format';
 import type { AreaProfile } from '@/lib/types';
@@ -7,9 +6,21 @@ import type { AreaProfile } from '@/lib/types';
 interface RankedStatesTableProps {
   /** All 37. Primary states are ranked; secondary ones are listed below. */
   states: AreaProfile[];
-  /** National roll-up, shown as the closing row so a state can be read against
-   *  the whole assessed population without leaving the table. */
-  national: AreaProfile | null;
+  /**
+   * Roll-up for the states in scope, shown as the closing row so a state can be
+   * read against the whole population without leaving the table.
+   *
+   * Structurally typed rather than `AreaProfile`, because under a zone filter
+   * this is an `aggregateAreaProfiles` result — a real roll-up of the states in
+   * scope, with no id or geography of its own. Only these four fields are read.
+   */
+  national: Pick<
+    AreaProfile,
+    'archetypeDistribution' | 'facilityCount' | 'averageScore' | 'themeScores'
+  > | null;
+  /** Drill into a state — the same destination every other state affordance on
+   *  this page takes, so a row and a polygon do not go to different places. */
+  onSelectState: (state: AreaProfile) => void;
 }
 
 /**
@@ -29,9 +40,11 @@ interface RankedStatesTableProps {
  * mostly empty cells implying missing data rather than a different kind of
  * evidence.
  */
-export function RankedStatesTable({ states, national }: RankedStatesTableProps) {
-  const navigate = useNavigate();
-
+export function RankedStatesTable({
+  states,
+  national,
+  onSelectState,
+}: RankedStatesTableProps) {
   const primary = states
     .filter((s) => s.evidenceGrade === 'primary')
     .sort((a, b) => (b.averageScore ?? 0) - (a.averageScore ?? 0));
@@ -81,7 +94,7 @@ export function RankedStatesTable({ states, national }: RankedStatesTableProps) 
             {primary.map((state, i) => (
               <tr
                 key={state.id}
-                onClick={() => navigate(`/explore?at=${state.id}`)}
+                onClick={() => onSelectState(state)}
                 className="cursor-pointer border-b border-border transition-colors hover:bg-surface-sunk"
               >
                 <td className="mono py-2 pr-2 text-[10.5px] text-muted-foreground">

@@ -6,6 +6,10 @@ import { cn } from '@/lib/cn';
 interface PageHeaderProps {
   title: string;
   subtitle?: string;
+  /** A way back up the hierarchy, rendered immediately before the title. Kept
+   *  as a slot rather than a `to` prop because going back is rarely only a
+   *  navigation — Assessed States has to drop its state scope on the way out. */
+  back?: React.ReactNode;
   /** Filter controls. Rendered as their own hairline-separated row beneath the
    *  title bar, so the title row keeps a fixed height on every page. */
   children?: React.ReactNode;
@@ -27,6 +31,7 @@ interface PageHeaderProps {
 export function PageHeader({
   title,
   subtitle,
+  back,
   children,
   actions,
   className,
@@ -42,6 +47,7 @@ export function PageHeader({
     <header className={cn('sticky top-0 z-30 shrink-0', className)}>
       <div className="flex min-h-[52px] items-center gap-4 border-b border-border bg-surface px-4 sm:px-5">
         <div className="flex min-w-0 items-baseline gap-3">
+          {back}
           <h1 className="shrink-0 text-base font-semibold tracking-tight text-foreground">
             {title}
           </h1>

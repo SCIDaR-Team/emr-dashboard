@@ -1,7 +1,9 @@
+import { useRef } from 'react';
 import { Outlet } from 'react-router-dom';
 import { MobileNavBar, Sidebar } from './Sidebar';
 import { Toaster } from '@/components/ui';
 import { useFilterUrlSync } from '@/hooks/useFilterUrlSync';
+import { useScrollRestoration } from '@/hooks/useScrollRestoration';
 
 /**
  * App shell: fixed dark-green sidebar, scrolling content.
@@ -11,9 +13,15 @@ import { useFilterUrlSync } from '@/hooks/useFilterUrlSync';
  * widest element on the page. The URL sync is mounted here, once, because it
  * must survive route changes: it is the filter state that persists across
  * modules, not the page rendering it.
+ *
+ * `main` is the scroll container, not the window, so scroll restoration is
+ * mounted here against it — see useScrollRestoration.
  */
 export function AppShell() {
   useFilterUrlSync();
+
+  const mainRef = useRef<HTMLElement>(null);
+  useScrollRestoration(mainRef);
 
   return (
     // `relative` is load-bearing, not cosmetic. `sr-only` is `position:
@@ -42,6 +50,7 @@ export function AppShell() {
       <div className="flex min-w-0 flex-1 flex-col">
         <MobileNavBar />
         <main
+          ref={mainRef}
           id="main"
           // `tabIndex={-1}` so the skip link actually moves focus: an anchor to
           // a non-focusable element scrolls the page but leaves focus where it

@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight } from 'lucide-react';
+import { AlertTriangle, ArrowRight } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import {
   LoadError,
@@ -15,10 +15,17 @@ import {
   TileRow,
 } from '@/components/ui';
 import { NigeriaChoropleth } from '@/components/map';
+import { RoadmapMatrix } from '@/components/scorecard';
 import { useDataContext } from '@/state/dataContext';
 import { BAND_ACTION, BAND_LABEL, toBand } from '@/lib/bands';
-import { formatCount, formatScore } from '@/lib/format';
+import { formatCount, formatNaira, formatScore } from '@/lib/format';
 import { buildShareMap } from '@/lib/scale';
+import {
+  lineTotal,
+  usesIllustrative,
+  type RateContext,
+} from '@/modules/investment/investmentRates';
+import { useInvestmentRateStore } from '@/store/investmentRateStore';
 
 const score2 = (v: number | null | undefined) => formatScore(v, 2);
 import { SUB_THEMES, THEMES, THEME_BY_ID } from '@/lib/themes';
@@ -49,6 +56,15 @@ export default function HomePage() {
   const { national, states, lgas } = useDataContext();
   const profile = national.data;
 
+  // Unit rates come from the shared store, so a rate typed on the Investment
+  // Plan page is already in force by the time the reader gets back here.
+  const entered = useInvestmentRateStore((s) => s.entered);
+  const illustrative = useInvestmentRateStore((s) => s.illustrative);
+  const rateCtx: RateContext = useMemo(
+    () => ({ entered, illustrative }),
+    [entered, illustrative],
+  );
+
   const primaryStates = useMemo(
     () => states.data.filter((s) => s.evidenceGrade === 'primary'),
     [states.data],
@@ -73,7 +89,11 @@ export default function HomePage() {
     [profile],
   );
 
-  const investment = useMemo(() => investmentByTheme(profile), [profile]);
+  const investment = useMemo(
+    () => investmentByTheme(profile, rateCtx),
+    [profile, rateCtx],
+  );
+  const costIsIllustrative = usesIllustrative(profile?.investments ?? [], rateCtx);
 
   /** Share of each state's facilities in the Not-ready band, fitted to the
    *  observed range — see the note on GeoDatum.step. */
@@ -150,9 +170,25 @@ export default function HomePage() {
         </section>
 
         {/* ── Where, and what it costs ────────────────────────────── */}
-        <section className="grid items-start gap-4 xl:grid-cols-2">
+        {/*
+          The two cards are held to one height (grid `stretch`, the default),
+          and which of them would otherwise be the taller flips with the rail:
+          collapsing it widens both columns, and the map keeps a fixed aspect
+          ratio, so it grows taller while the investment panels — bars and text
+          — do not. Left to their natural heights they swap places as the tallest
+          every time the rail is toggled.
+
+          Equal height alone would just move the slack inside the shorter card,
+          so each body is a flex column whose closing element is pushed to the
+          bottom with `mt-auto`: the map's legend, and the investment card's
+          note. The slack lands between blocks that already read as separate,
+          rather than as a gap under the last line of a card.
+        */}
+        <section className="grid gap-4 xl:grid-cols-2">
           <SectionCard
             title="Where the not-ready facilities are"
+            className="flex flex-col"
+            bodyClassName="flex flex-1 flex-col"
             action={
               <Link
                 to="/states"
@@ -163,18 +199,27 @@ export default function HomePage() {
             }
           >
             <NigeriaChoropleth data={mapData.data} />
-            <ScaleLegend
-              lo={mapData.lo}
-              hi={mapData.hi}
-              format={(v) => `${Math.round(v)}%`}
-              caption="Share of facilities not ready"
-              note="Hover a state to name it. The 25 desk-review states carry no facility-level findings and are counted in no average."
-            />
+            <div className="mt-auto pt-3">
+              <ScaleLegend
+                lo={mapData.lo}
+                hi={mapData.hi}
+                format={(v) => `${Math.round(v)}%`}
+                caption="Share of facilities not ready"
+                note="Hover a state to name it. The 25 desk-review states carry no facility-level findings and are counted in no average."
+              />
+            </div>
           </SectionCard>
 
+          {/* Both halves of the investment picture, in the one card: items by
+              domain and cost by domain. They used to be two cards on the
+              Investment Plan page, drawing the same five-domain list twice; here
+              they share the theme labels and, between them, fill the column
+              beside the map rather than leaving it short. */}
           <SectionCard
             title="Investment required"
             subtitle={`${formatCount(investment.total)} costed items`}
+            className="flex flex-col"
+            bodyClassName="flex flex-1 flex-col"
             action={
               <Link
                 to="/investment"
@@ -184,6 +229,7 @@ export default function HomePage() {
               </Link>
             }
           >
+            <p className="eyebrow mb-2">Items by domain</p>
             <div className="space-y-2.5">
               {THEMES.map((theme) => {
                 const q = investment.byTheme[theme.id] ?? 0;
@@ -208,7 +254,93 @@ export default function HomePage() {
               })}
             </div>
 
-            <div className="mt-4 border-l-2 border-brand-500 pl-4">
+            <div className="mt-5 border-t border-border pt-4">
+              <div className="mb-2 flex items-baseline justify-between gap-3">
+                <p className="eyebrow">Cost by domain</p>
+                {/* "Scaled separately" is doing real work in two words: these
+                    bars run against their own largest domain, not against the
+                    item bars above, because items reach ~30,000 and naira runs
+                    to billions. Without it a reader compares a cost bar's length
+                    to the item bar directly above it and reads the two as
+                    proportional. Only shown once there are bars to mis-read. */}
+                <span className="mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+                  {investment.costTotal == null
+                    ? 'awaiting rates'
+                    : `${costIsIllustrative ? 'illustrative rates' : 'entered rates'} · scaled separately`}
+                </span>
+              </div>
+
+              {investment.costTotal == null ? (
+                // No rates anywhere: the bars would all be empty, so say why
+                // instead of drawing five blank tracks. The source workbook
+                // carries no cost table at all — see investmentRates.ts.
+                <div className="border border-dashed border-input px-3.5 py-4">
+                  <p className="text-[13px] text-muted-foreground">
+                    The assessment publishes no unit-cost table, so there is nothing to
+                    total yet. Enter rates — or switch on the labelled placeholders — on
+                    the{' '}
+                    <Link to="/investment" className="text-brand-500 hover:text-brand-600">
+                      Investment Plan
+                    </Link>{' '}
+                    page, and every naira figure in the dashboard follows.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {costIsIllustrative && (
+                    <div
+                      role="note"
+                      className="mb-3 flex items-start gap-2.5 border border-moderate bg-moderate-wash px-3 py-2"
+                    >
+                      <AlertTriangle
+                        className="mt-0.5 h-3.5 w-3.5 shrink-0 text-moderate"
+                        aria-hidden
+                      />
+                      <p className="text-[12px] text-foreground">
+                        <strong className="font-semibold">
+                          Illustrative rates, not NPHCDA figures.
+                        </strong>{' '}
+                        <span className="text-muted-foreground">
+                          Item counts are real; do not quote a naira total from this view.
+                        </span>
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="space-y-2.5">
+                    {THEMES.map((theme) => {
+                      const cost = investment.costByTheme[theme.id] ?? 0;
+                      return (
+                        <div key={theme.id}>
+                          <div className="mb-1 flex items-baseline justify-between gap-3 text-[12.5px]">
+                            <span
+                              className={
+                                cost ? 'text-muted-foreground' : 'text-muted-foreground/60'
+                              }
+                            >
+                              {theme.label}
+                            </span>
+                            <span className="mono font-semibold text-foreground">
+                              {cost ? formatNaira(cost, true) : 'none'}
+                            </span>
+                          </div>
+                          <div className="h-[7px] rounded-[1px] bg-surface-sunk">
+                            <span
+                              className={`block h-full rounded-r-[3px] ${cost ? 'bg-score-3' : 'bg-nodata'}`}
+                              style={{
+                                width: `${cost ? (cost / investment.maxCost) * 100 : 0}%`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="mt-auto border-l-2 border-brand-500 pl-4 pt-5">
               <p className="mono mb-1 text-[10px] uppercase tracking-[0.12em] text-brand-500">
                 The hole in the plan
               </p>
@@ -224,7 +356,38 @@ export default function HomePage() {
               </p>
             </div>
           </SectionCard>
+
         </section>
+
+        {/* Follows the investment card, at full width.
+
+            It cannot go *inside* that column: the matrix is six months plus an
+            archetype and a total column, and at half width it renders three of
+            the six and scrolls for the rest — a 6-month plan that shows three
+            months is not the plan. It sits under the row instead, and the cards
+            in that row keep their own heights — the investment card now carries
+            both its panels and runs past the map, and stretching the map to
+            match would only put the whitespace inside its border.
+
+            The plan itself is a national statement — a fixed activity sequence
+            per readiness band, drawn against the national facility
+            distribution. It used to close National Coverage, where the counts
+            beside each row moved with a state filter and implied a per-state
+            schedule the assessment never supplied. */}
+        <SectionCard
+          title="Roadmap · 6-month plan"
+          subtitle="what each readiness band does, month by month"
+          action={
+            <Link
+              to="/states"
+              className="mono inline-flex items-center gap-1.5 text-[10.5px] uppercase tracking-[0.08em] text-brand-500 hover:text-brand-600"
+            >
+              Which states first <ArrowRight className="h-3 w-3" aria-hidden />
+            </Link>
+          }
+        >
+          <RoadmapMatrix distribution={profile.archetypeDistribution} />
+        </SectionCard>
 
         <p className="mono text-[10.5px] text-muted-foreground">
           {formatCount(total)} facilities · {primaryStates.length} states assessed by facility
@@ -380,13 +543,40 @@ function listOf(items: { label: string }[]): string {
  *  lists in the finding *open* one, so the first word needs its capital back. */
 const openSentence = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-function investmentByTheme(profile: AreaProfile | null) {
+/**
+ * Item counts and cost per theme.
+ *
+ * Two series over the same five domains, and deliberately two separate scales:
+ * items run into the tens of thousands and naira into the billions, so a shared
+ * maximum would pin every cost bar full and flatten every item bar to nothing.
+ * Each series is drawn against its own largest domain, which means a bar length
+ * compares within items or within cost — never across the two.
+ *
+ * `costTotal` is null, not zero, when no rate is in force anywhere: the source
+ * workbook publishes no cost table, and "we cannot say" must not render as "₦0".
+ */
+function investmentByTheme(profile: AreaProfile | null, ctx: RateContext) {
   const byTheme: Partial<Record<ThemeId, number>> = {};
+  const costByTheme: Partial<Record<ThemeId, number>> = {};
   let total = 0;
+  let priced = 0;
+
   for (const item of profile?.investments ?? []) {
     byTheme[item.themeId] = (byTheme[item.themeId] ?? 0) + (item.quantity ?? 0);
     total += item.quantity ?? 0;
+
+    const cost = lineTotal(item, ctx);
+    if (cost != null) {
+      costByTheme[item.themeId] = (costByTheme[item.themeId] ?? 0) + cost;
+      priced += 1;
+    }
   }
+
   const max = Math.max(1, ...Object.values(byTheme).map((v) => v ?? 0));
-  return { byTheme, total, max };
+  const maxCost = Math.max(1, ...Object.values(costByTheme).map((v) => v ?? 0));
+  const costTotal = priced
+    ? Object.values(costByTheme).reduce((sum, v) => sum + (v ?? 0), 0)
+    : null;
+
+  return { byTheme, total, max, costByTheme, maxCost, costTotal };
 }

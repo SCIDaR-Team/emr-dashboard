@@ -10,7 +10,7 @@ import { useDataContext } from '@/state/dataContext';
 import { useFilterStore } from '@/store/filterStore';
 import { archetypeDistribution, compositeReadiness } from '@/lib/archetype';
 import { toBand } from '@/lib/bands';
-import { FACILITY_THEMES } from '@/lib/themes';
+import { FACILITY_THEMES, SUB_THEMES } from '@/lib/themes';
 import type {
   Band,
   FacilitySummary,
@@ -105,6 +105,15 @@ export interface FilteredMetrics {
   compositeReadiness: number | null;
   averageScore: number | null;
   themeAverages: Record<FacilityThemeId, number | null>;
+  /**
+   * Mean per sub-theme across the filtered population, keyed by sub-theme id.
+   *
+   * Covers the 19 sub-themes that carry a scored indicator. Leadership &
+   * Governance has none — it is assessed once per state with no facility
+   * instrument behind it — so its three sub-themes never appear here, and a
+   * caller must not read their absence as a filter matching nothing.
+   */
+  subThemeAverages: Record<string, number | null>;
 }
 
 function mean(values: number[]): number | null {
@@ -132,6 +141,17 @@ export function useFilteredData() {
       ]),
     ) as Record<FacilityThemeId, number | null>;
 
+    const subThemeAverages = Object.fromEntries(
+      SUB_THEMES.map((sub) => [
+        sub.id,
+        mean(
+          filtered
+            .map((f) => f.subThemeScores?.[sub.id] ?? null)
+            .filter((v): v is number => v != null),
+        ),
+      ]),
+    );
+
     return {
       total: filtered.length,
       distribution: archetypeDistribution(filtered.map((f) => f.archetype)),
@@ -142,6 +162,7 @@ export function useFilteredData() {
           .filter((s): s is number => s != null),
       ),
       themeAverages,
+      subThemeAverages,
     };
   }, [filtered]);
 
