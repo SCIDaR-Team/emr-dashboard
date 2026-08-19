@@ -214,7 +214,7 @@ export default function FacilityScorecardPage() {
             message="That facility id does not match anything in the current dataset."
           />
         ) : (
-          <div ref={sheetRef}>
+          <div ref={sheetRef} className="space-y-4">
             <GatePanel facility={facility} />
 
             {/* Where the score comes from — the sub-theme bars behind each
@@ -473,7 +473,7 @@ function GatePanel({ facility }: { facility: Facility }) {
   const core = coreScores.length ? Math.min(...coreScores) : null;
 
   return (
-    <div className="card mb-4">
+    <div className="card">
       <header className="flex flex-wrap items-start justify-between gap-4 border-b border-border px-4 py-3.5">
         <div className="min-w-0">
           <p className="mono text-[10px] uppercase tracking-[0.11em] text-muted-foreground">
@@ -501,11 +501,16 @@ function GatePanel({ facility }: { facility: Facility }) {
           const failing = isCore && score != null && score <= BAND_LOWER_CUT;
           const band = toBand(score);
 
+          /* Each row is its own grid, so the verdict column is pinned rather
+             than sized to content: `auto` let the longest maturity label —
+             INSTITUTIONALIZED against OPTIMIZED — steal width from the track,
+             and four bars that stop at four different points cannot be read
+             against each other or against the cut hairline. */
           return (
             <div
               key={theme.id}
               className={cn(
-                'grid items-center gap-4 border-b border-border py-2.5 last:border-b-0 sm:grid-cols-[176px_1fr_auto]',
+                'grid items-center gap-4 border-b border-border py-2.5 last:border-b-0 sm:grid-cols-[176px_1fr_172px]',
                 failing && '-mx-4 bg-notready-wash px-4',
               )}
             >
@@ -543,7 +548,18 @@ function GatePanel({ facility }: { facility: Facility }) {
                   {score == null ? 'n/s' : formatScore(score, 2)}
                 </p>
                 <div className="mt-1 flex justify-end">
-                  <MaturityBadge score={score} size="sm" />
+                  {/* Once the row is a grid, the meter spans the whole verdict
+                      column rather than shrinking to its label: the step blocks
+                      then start on one line down the card and the label still
+                      ends flush with the score. Stacked on narrow screens there
+                      is no column to align to, and stretching the meter across
+                      the full width would just strand the label. */}
+                  <MaturityBadge
+                    score={score}
+                    size="sm"
+                    className="flex w-auto sm:w-full"
+                    labelClassName="sm:flex-1 sm:text-right"
+                  />
                 </div>
               </div>
             </div>

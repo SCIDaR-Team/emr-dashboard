@@ -280,10 +280,14 @@ export function MaturityMeter({
   score,
   size = 'sm',
   className,
+  labelClassName,
 }: {
   score: number | null;
   size?: 'sm' | 'lg';
   className?: string;
+  /** Class for the text label. Give it a width where several meters stack and
+   *  the ragged label lengths would otherwise shunt the step blocks sideways. */
+  labelClassName?: string;
 }) {
   const level = toMaturityLevel(score);
   const index = level ? MATURITY_BANDS.findIndex((b) => b.level === level) : -1;
@@ -315,6 +319,7 @@ export function MaturityMeter({
         className={cn(
           'mono uppercase tracking-[0.09em] text-muted-foreground',
           size === 'lg' ? 'text-[10.5px]' : 'text-[9.5px]',
+          labelClassName,
         )}
       >
         {label}
