@@ -18,7 +18,6 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          echarts: ['echarts', 'echarts-for-react'],
           react: ['react', 'react-dom', 'react-router-dom'],
         },
       },

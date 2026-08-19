@@ -151,8 +151,8 @@ export default function ExplorerPage() {
   return (
     <>
       <PageHeader
-        title="Drill-Down Explorer"
-        subtitle="Explore readiness by geography and thematic area, from national down to facility"
+        title="Report Explorer"
+        subtitle="Explore the findings by geography and thematic area"
       >
         <div className="flex w-full flex-wrap items-end justify-between gap-x-6 gap-y-3">
           <ExplorerBreadcrumb
@@ -194,7 +194,7 @@ export default function ExplorerPage() {
         />
       </PageHeader>
 
-      <div className="grid gap-5 px-4 pb-8 sm:px-6 lg:grid-cols-[18rem_1fr] lg:gap-6 lg:px-8">
+      <div className="grid gap-4 p-4 sm:p-5 lg:grid-cols-[17rem_1fr]">
         {/* The rail is desktop-only; below `lg` the same tree lives behind
             `ThemePicker`, which explains the choice. */}
         <aside className="hidden lg:block">
@@ -236,6 +236,7 @@ export default function ExplorerPage() {
             <div className="card p-3 sm:p-5">
               <ExplorerMap
                 geoPath={geoPath}
+                aggregation={selection.aggregation}
                 data={data}
                 onDrillInto={drillInto}
                 onDrillUp={() => drillTo(Math.max(0, geoPath.parts.length - 1))}

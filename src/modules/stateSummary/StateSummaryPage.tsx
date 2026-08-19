@@ -1,23 +1,27 @@
 import { useMemo } from 'react';
+import { Link } from 'react-router-dom';
+import { RankedStatesTable } from './RankedStatesTable';
 import { CheckCircle2, CircleSlash, MinusCircle } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import {
-  Card,
   EmptyState,
   LoadError,
   MaturityBadge,
   MultiSelectDropdown,
   PageSkeleton,
+  BandLegend,
+  ScaleLegend,
   SectionCard,
 } from '@/components/ui';
 import { FilterBar } from '@/components/filters/FilterBar';
-import { NigeriaChoropleth, MapLegend, type GeoDatum } from '@/components/map';
-import { InvestmentTable, RoadmapMatrix } from '@/components/scorecard';
+import { NigeriaChoropleth, type GeoDatum } from '@/components/map';
 import { useDataContext } from '@/state/dataContext';
 import { useFilterStore } from '@/store/filterStore';
 import { aggregateAreaProfiles } from '@/lib/areaProfile';
 import { BAND_LABEL } from '@/lib/bands';
 import { COVERAGE } from '@/lib/constants';
+import { RoadmapMatrix } from '@/components/scorecard';
+import { buildShareMap } from '@/lib/scale';
 import { formatCount, formatScore } from '@/lib/format';
 import { THEMES } from '@/lib/themes';
 import type { Band } from '@/lib/types';
@@ -88,22 +92,29 @@ export default function StateSummaryPage() {
   // "no data", the same visual the secondary-evidence states already use for
   // "nothing to show here") — otherwise neither filter has any visible effect
   // beyond the KPI cards, which is exactly the "does this do anything?" bug.
+  //
+  // The fill is a *share*, not a band. Every one of the 12 assessed states
+  // classifies to the same state-level band, so a band choropleth here paints
+  // twelve identical polygons and encodes exactly one value — a lot of screen
+  // for "twelve states are amber". Share-not-ready runs 21%-86% across the
+  // same states, so the sequential ramp has something to say. See
+  // `buildShareMap` and the note on `GeoDatum.step`.
   const visibleIds = new Set(visiblePrimaryStates.map((s) => s.id));
+  const shareMap = useMemo(() => buildShareMap(states.data), [states.data]);
   const polygonData = useMemo<Record<string, GeoDatum>>(
     () =>
       Object.fromEntries(
-        states.data.map((s) => [
-          s.id,
-          {
-            band: s.evidenceGrade === 'primary' && !visibleIds.has(s.id) ? null : s.band,
-            n: s.facilityCount,
-            evidenceGrade: s.evidenceGrade,
-            label: s.name,
-          },
+        Object.entries(shareMap.data).map(([id, datum]) => [
+          id,
+          // Filtered-out states drop to the no-data treatment, so a filter has
+          // a visible effect on the map and not just on the tiles above it.
+          datum.evidenceGrade === 'primary' && !visibleIds.has(id)
+            ? { ...datum, band: null, step: null, valueLabel: undefined }
+            : datum,
         ]),
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- visibleIds is derived fresh each render from visiblePrimaryStates
-    [states.data, visiblePrimaryStates],
+    [shareMap, visiblePrimaryStates],
   );
 
   const isLoading = states.isLoading || national.isLoading || facilitiesFetch.isLoading;
@@ -125,8 +136,8 @@ export default function StateSummaryPage() {
   return (
     <>
       <PageHeader
-        title="State Summary"
-        subtitle={`Readiness across ${COVERAGE.statesTotal} states using state-level findings`}
+        title="National Coverage"
+        subtitle={`All ${COVERAGE.statesTotal} states and how each was evidenced`}
       >
         {/* Readiness is passed through FilterBar's slot rather than rendered
             beside it: FilterBar owns the row, so a sibling control lands on a
@@ -143,7 +154,7 @@ export default function StateSummaryPage() {
         </FilterBar>
       </PageHeader>
 
-      <div className="space-y-5 px-4 pb-8 sm:px-6 lg:space-y-6 lg:px-8">
+      <div className="space-y-4 p-4 sm:p-5">
         {hasError && (
           <LoadError what="the state summary" error={hasError} onRetry={states.refetch} />
         )}
@@ -194,7 +205,13 @@ export default function StateSummaryPage() {
                     data={polygonData}
                     selectedId={visiblePrimaryStates.length === 1 ? (visiblePrimaryStates[0]?.id ?? null) : null}
                   />
-                  <MapLegend showSecondary />
+                  <ScaleLegend
+                    lo={shareMap.lo}
+                    hi={shareMap.hi}
+                    format={(v) => `${Math.round(v)}%`}
+                    caption="Share of facilities not ready"
+                    note="The map carries a share, not a band: all 12 assessed states classify to the same state-level band, so a band map would paint twelve identical polygons. The 45° hatch is evidence grade — those 25 states were desk-reviewed and are counted in no average."
+                  />
                 </div>
 
                 <div className="rounded-lg border border-border p-4">
@@ -243,6 +260,14 @@ export default function StateSummaryPage() {
                   </div>
                 </div>
               </div>
+            </SectionCard>
+
+            <SectionCard
+              title="The 12 assessed states, ranked"
+              subtitle="composition, not average, is what a rollout plan needs"
+              action={<BandLegend />}
+            >
+              <RankedStatesTable states={states.data} national={national.data} />
             </SectionCard>
 
             <SectionCard
@@ -304,7 +329,14 @@ export default function StateSummaryPage() {
                       </p>
                     </div>
                   </div>
-                  <InvestmentTable items={scope.investments} />
+                  <p className="mono mt-4 border-t border-border pt-3 text-[10.5px] leading-relaxed text-muted-foreground">
+                    Unit and total costs, per-domain subtotals and the full{' '}
+                    {scope.investments.length}-action schedule live on the{' '}
+                    <Link to="/investment" className="text-brand-500 hover:text-brand-600">
+                      Investment Plan
+                    </Link>{' '}
+                    page.
+                  </p>
                 </>
               ) : visiblePrimaryStates.length === 0 ? (
                 <EmptyState
@@ -321,17 +353,29 @@ export default function StateSummaryPage() {
               )}
             </SectionCard>
 
-            <Card>
-              <h2 className="text-base font-semibold text-brand-700">Roadmap (6 month plan)</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Activity per month, by readiness archetype
-                {scopeLabel === 'National' ? ' — all 12 assessed states' : ` — ${scopeLabel}`}.
-              </p>
+            <SectionCard
+              title="Roadmap · 6-month plan"
+              subtitle={
+                scopeLabel === 'National'
+                  ? 'what each readiness band does, month by month — all 12 assessed states'
+                  : `what each readiness band does, month by month — ${scopeLabel}`
+              }
+            >
               <RoadmapMatrix
-                distribution={scope?.archetypeDistribution ?? { ready: 0, moderately_ready: 0, not_ready: 0 }}
-                className="mt-4"
+                distribution={
+                  scope?.archetypeDistribution ?? {
+                    ready: 0,
+                    moderately_ready: 0,
+                    not_ready: 0,
+                  }
+                }
               />
-            </Card>
+              <p className="mono mt-3 text-[10.5px] leading-relaxed text-muted-foreground">
+                Activities are the assessment&rsquo;s fixed 6-month plan; cost per cell awaits
+                the same signed-off cost table as every other investment figure
+                (guide §9.2, §17.4).
+              </p>
+            </SectionCard>
           </div>
         )}
       </div>

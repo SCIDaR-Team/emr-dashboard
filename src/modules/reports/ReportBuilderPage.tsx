@@ -34,7 +34,7 @@ import { useMemo, useRef, useState } from 'react';
 import { Download, FileText, Image, Loader2 } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { FilterBar } from '@/components/filters/FilterBar';
-import { Card, EmptyState, LoadError, Skeleton } from '@/components/ui';
+import { EmptyState, LoadError, SectionCard, Skeleton } from '@/components/ui';
 import { useFilteredData } from '@/hooks/useFilteredData';
 import { useDataContext } from '@/state/dataContext';
 import { useFilterStore } from '@/store/filterStore';
@@ -229,8 +229,8 @@ export default function ReportBuilderPage() {
   return (
     <>
       <PageHeader
-        title="Report Builder"
-        subtitle="Generate a scoped, stakeholder-ready report — preview it, then download it"
+        title="Generate Report"
+        subtitle="Scope it, preview it, download it"
       >
         <FilterBar
           facilities={allFacilities}
@@ -238,7 +238,7 @@ export default function ReportBuilderPage() {
         />
       </PageHeader>
 
-      <div className="px-4 pb-8 sm:px-6 lg:px-8">
+      <div className="p-4 sm:p-5">
         {error && <LoadError what="the facility summary" error={error} onRetry={retry} />}
 
         {isLoading && !hasData ? (
@@ -262,18 +262,19 @@ export default function ReportBuilderPage() {
             {/* ── Controls ── */}
             <div className="space-y-4 xl:col-span-4">
               {/* Scope */}
-              <Card>
-                <h2 className="text-sm font-semibold text-foreground">Scope</h2>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Controlled by the filter bar above. The report covers exactly this
-                  selection.
+              <SectionCard
+                title="Scope"
+                subtitle="set by the filter bar above"
+              >
+                <p className="text-xs text-muted-foreground">
+                  The report covers exactly this selection.
                 </p>
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {scopeChips.length ? (
                     scopeChips.map((c) => (
                       <span
                         key={c}
-                        className="rounded-full border border-border bg-muted px-2.5 py-0.5 text-xs text-foreground/80"
+                        className="mono border border-input bg-surface-sunk px-2 py-0.5 text-[10.5px] text-foreground"
                       >
                         {c}
                       </span>
@@ -284,16 +285,15 @@ export default function ReportBuilderPage() {
                     </span>
                   )}
                 </div>
-                <p className="mt-3 text-xs font-medium text-brand-600">
+                <p className="mono mt-3 text-[11px] font-semibold text-foreground">
                   {facilities.length.toLocaleString()} of{' '}
                   {allFacilities.length.toLocaleString()} facilities in scope
                 </p>
-              </Card>
+              </SectionCard>
 
               {/* Template */}
-              <Card>
-                <h2 className="text-sm font-semibold text-foreground">Template</h2>
-                <div className="mt-3 space-y-2">
+              <SectionCard title="Template" bodyClassName="p-0">
+                <div className="flex flex-col">
                   {REPORT_TEMPLATES.map((t) => {
                     const selected = t.id === templateId;
                     return (
@@ -303,14 +303,14 @@ export default function ReportBuilderPage() {
                           onClick={() => pickTemplate(t.id)}
                           aria-pressed={selected}
                           className={cn(
-                            'w-full rounded-lg border p-3 text-left transition-colors',
-                            'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                            'w-full border-b border-l-2 border-border px-3 py-2.5 text-left transition-colors',
+                            'focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
                             selected
-                              ? 'border-brand-500 bg-brand-50'
-                              : 'border-border hover:border-brand-500/50 hover:bg-muted',
+                              ? 'border-l-brand-500 bg-brand-50'
+                              : 'border-l-transparent hover:bg-surface-sunk',
                           )}
                         >
-                          <span className="block text-sm font-medium text-foreground">
+                          <span className="block text-[13px] font-semibold text-foreground">
                             {t.title}
                           </span>
                           <span className="mt-0.5 block text-xs text-muted-foreground">
@@ -319,10 +319,10 @@ export default function ReportBuilderPage() {
                         </button>
 
                         {selected && (
-                          <div className="mt-3 pl-1">
+                          <div className="border-b border-border bg-surface-sunk px-3 py-3">
                             {t.id === 'thematic' && (
                               <label className="mb-3 block">
-                                <span className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                                <span className="mono mb-1 block text-[9.5px] uppercase tracking-[0.11em] text-muted-foreground">
                                   Thematic area
                                 </span>
                                 <select
@@ -342,7 +342,7 @@ export default function ReportBuilderPage() {
                               </label>
                             )}
 
-                            <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                            <p className="mono mb-2 text-[9.5px] uppercase tracking-[0.11em] text-muted-foreground">
                               Sections
                             </p>
                             <div className="space-y-1.5">
@@ -369,7 +369,7 @@ export default function ReportBuilderPage() {
                 </div>
 
                 {!requirement.met && (
-                  <p className="mt-3 rounded-md border-l-2 border-moderate bg-moderate-wash px-3 py-2 text-xs text-foreground/80">
+                  <p className="mx-3 mt-3 border-l-2 border-moderate bg-moderate-wash px-3 py-2 text-xs text-foreground">
                     {requirement.message}
                   </p>
                 )}
@@ -383,7 +383,7 @@ export default function ReportBuilderPage() {
                     // inverts between schemes and white does not, which is the
                     // rule globals.css states beside the ramp. White here
                     // measured 1.97:1 against dark-mode brand-600.
-                    'mt-4 flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-brand-500 px-3 text-sm font-semibold text-surface transition-colors',
+                    'm-3 flex h-9 w-[calc(100%-1.5rem)] items-center justify-center gap-2 bg-brand-500 px-3 text-[13px] font-semibold text-surface transition-colors',
                     'hover:bg-brand-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
                     'disabled:cursor-not-allowed disabled:opacity-50',
                   )}
@@ -401,15 +401,13 @@ export default function ReportBuilderPage() {
                         : 'Generate report'}
                   </span>
                 </button>
-              </Card>
+              </SectionCard>
 
-              {/* Download */}
-              <Card>
-                <h2 className="text-sm font-semibold text-foreground">Download</h2>
+              <SectionCard title="Download">
                 <div
                   role="radiogroup"
                   aria-label="Download format"
-                  className="mt-3 grid grid-cols-2 gap-2"
+                  className="grid grid-cols-2 gap-2"
                 >
                   {FORMATS.map((f) => {
                     const Icon = f.icon;
@@ -423,11 +421,11 @@ export default function ReportBuilderPage() {
                         onClick={() => setFormat(f.id)}
                         title={f.hint}
                         className={cn(
-                          'flex flex-col items-center gap-1 rounded-lg border py-2.5 text-xs font-medium transition-colors',
+                          'flex flex-col items-center gap-1 border py-2.5 text-xs font-medium transition-colors',
                           'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
                           selected
-                            ? 'border-brand-500 bg-brand-50 text-brand-700'
-                            : 'border-border text-muted-foreground hover:border-brand-500/50',
+                            ? 'border-brand-500 bg-brand-50 text-foreground'
+                            : 'border-input text-muted-foreground hover:border-brand-500/50',
                         )}
                       >
                         <Icon className="h-4 w-4" aria-hidden />
@@ -441,7 +439,7 @@ export default function ReportBuilderPage() {
                   onClick={() => void handleDownload()}
                   disabled={!doc || busy !== null}
                   className={cn(
-                    'mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-input px-3 text-sm font-semibold text-foreground transition-colors',
+                    'mt-3 flex h-9 w-full items-center justify-center gap-2 border border-input px-3 text-[13px] font-semibold text-foreground transition-colors',
                     'hover:border-brand-500/50 hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
                     'disabled:cursor-not-allowed disabled:opacity-50',
                   )}
@@ -458,11 +456,11 @@ export default function ReportBuilderPage() {
                   </span>
                 </button>
                 {!doc && (
-                  <p className="mt-2 text-xs text-muted-foreground">
+                  <p className="mono mt-2 text-[10.5px] text-muted-foreground">
                     Generate a report first.
                   </p>
                 )}
-              </Card>
+              </SectionCard>
             </div>
 
             {/* ── Preview ──
@@ -470,10 +468,17 @@ export default function ReportBuilderPage() {
                 taller controls column drives, so the preview ends level with the
                 Download card. min-h keeps it usable once stacked. */}
             <div className="xl:col-span-8">
-              <Card className="h-full min-h-[600px] overflow-hidden p-0">
+              <SectionCard
+                title="Preview"
+                subtitle={doc ? 'A4 · portrait' : undefined}
+                className="h-full min-h-[600px] overflow-hidden"
+                bodyClassName="bg-surface-sunk p-0"
+              >
                 {doc ? (
-                  <div className="h-full overflow-y-auto">
-                    <ReportDocument doc={doc} innerRef={previewRef} />
+                  <div className="h-full overflow-y-auto p-4">
+                    <div className="mx-auto max-w-[760px] bg-surface shadow-sheet">
+                      <ReportDocument doc={doc} innerRef={previewRef} />
+                    </div>
                   </div>
                 ) : (
                   <div className="flex h-full min-h-[600px] flex-col items-center justify-center gap-3 px-6 text-center">
@@ -485,7 +490,7 @@ export default function ReportBuilderPage() {
                     </p>
                   </div>
                 )}
-              </Card>
+              </SectionCard>
             </div>
           </div>
         )}

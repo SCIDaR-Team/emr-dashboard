@@ -30,6 +30,42 @@ export interface GeoDatum {
   n: number;
   evidenceGrade: EvidenceGrade;
   label?: string;
+  /**
+   * Optional sequential step, 0–4, on the score ramp (`--s1` … `--s5`).
+   *
+   * When present the polygon is filled from the ramp instead of from its
+   * readiness band, and the layer becomes a magnitude choropleth. This is the
+   * default for the national map now, because every one of the 12 assessed
+   * states classifies to the *same* state-level band — a band choropleth there
+   * paints twelve identical polygons and encodes exactly one value. A share or
+   * a score varies, so the ramp has something to say. The band fill is still
+   * the right choice wherever the units genuinely differ in band.
+   *
+   * Callers must ship a scale legend with it: a sequential encoding is
+   * unreadable without one.
+   */
+  step?: number | null;
+  /** Pre-formatted measure for the tooltip, e.g. "54.1% not ready". */
+  valueLabel?: string;
+}
+
+/** Fill for a sequential step, or undefined when the datum has no step. */
+export function scoreStepFill(step: number | null | undefined): string | undefined {
+  if (step == null || !Number.isFinite(step)) return undefined;
+  const i = Math.max(0, Math.min(4, Math.round(step)));
+  return `hsl(var(--s${i + 1}))`;
+}
+
+/** Bucket a value onto the five-step ramp over an explicit domain.
+ *
+ *  Domains are fitted to the data actually drawn, not to the theoretical
+ *  range: share-not-ready spans 21–86% across the assessed states, so a fixed
+ *  0–100 domain drops eight of the twelve into one step and the map stops
+ *  discriminating. The legend prints the fitted bounds, so this stays honest. */
+export function stepFor(value: number | null, lo: number, hi: number): number | null {
+  if (value == null || !Number.isFinite(value) || hi <= lo) return null;
+  const t = (value - lo) / (hi - lo);
+  return Math.max(0, Math.min(4, Math.floor(Math.max(0, Math.min(0.999, t)) * 5)));
 }
 
 /**

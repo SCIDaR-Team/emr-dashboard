@@ -39,7 +39,7 @@ const PATTERN_FILL: Record<Band, string> = {
  * to near-white against a background that did not change, and the texture that
  * reads clearly in light mode all but vanishes in dark. Only the two mid-toned
  * bands are textured (Ready is solid), so one dark ink works on both in both
- * schemes. `bandDecal` in chartTheme.ts does the same thing for the same reason.
+ * schemes.
  */
 const MARK_INK = '#000';
 export function BandPatternDefs({ id, unit }: { id: string; unit: number }) {

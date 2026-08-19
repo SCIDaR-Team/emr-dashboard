@@ -14,6 +14,20 @@ export const PROGRAMME = {
   partners: ['NPHCDA', 'NTBLCP', 'The Global Fund', 'Solina'],
 } as const;
 
+/**
+ * NOTE — unresolved discrepancy, raised with the client and not yet settled.
+ *
+ * `lgas` and `facilitiesSampled` below come from the ERA Figma home screen. The
+ * shipped ETL output disagrees: `public/data/lgas.json` holds **305** LGAs,
+ * every one with at least one facility, and they sum to the 2,804 scored
+ * facilities exactly. So "205 LGAs" and "2,808 facilities" are the deck's
+ * figures, not the data's.
+ *
+ * Left as-is deliberately: these are published numbers and correcting them is
+ * NPHCDA's call, not a silent edit. Anything computed on screen reads the real
+ * data instead — see the LGA counts on Overview and Assessed States. Resolve
+ * the source of truth before this reaches a report.
+ */
 export const COVERAGE = {
   statesTotal: 37, // 36 + FCT
   statesPrimary: 12,

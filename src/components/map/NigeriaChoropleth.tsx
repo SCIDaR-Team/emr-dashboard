@@ -14,6 +14,7 @@ import {
   useHatchPatternId,
   useBandPatternId,
   bandPatternFill,
+  scoreStepFill,
   textureUnit,
   BOUNDARY_STROKE,
   fillOpacityFor,
@@ -181,9 +182,13 @@ export function NigeriaChoropleth({ data, selectedId, onSelect, className }: Nig
             // Tailwind fill class has to come *off* when one is in use: a class
             // sets `fill` through CSS, which outranks the attribute, and the
             // state would render flat with the texture silently dropped.
+            // A sequential step wins over the band when the caller supplied
+            // one — see the note on GeoDatum.step. Otherwise a band fill is a
+            // `<pattern>`: colour plus texture, so the scale survives a
+            // colour-vision deficiency and a greyscale print.
             const bandFill = isSecondary
               ? hatchFill(hatchId)
-              : bandPatternFill(bandId, datum?.band);
+              : (scoreStepFill(datum?.step) ?? bandPatternFill(bandId, datum?.band));
             const fillClass = bandFill ? undefined : 'fill-nodata';
 
             return (
@@ -205,7 +210,13 @@ export function NigeriaChoropleth({ data, selectedId, onSelect, className }: Nig
                 aria-label={
                   isSecondary
                     ? `${shape.name}, secondary evidence — desk review only, no facility detail`
-                    : `${shape.name}${datum?.band ? `, ${BAND_LABEL[datum.band]}` : ', no data'}`
+                    : `${shape.name}${
+                        datum?.valueLabel
+                          ? `, ${datum.valueLabel}`
+                          : datum?.band
+                            ? `, ${BAND_LABEL[datum.band]}`
+                            : ', no data'
+                      }`
                 }
                 style={{ cursor: interactive ? 'pointer' : 'default' }}
                 onFocus={() => interactive && setFocused(shape.stateId)}

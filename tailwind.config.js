@@ -11,7 +11,10 @@ export default {
         input: 'hsl(var(--input) / <alpha-value>)',
         ring: 'hsl(var(--ring) / <alpha-value>)',
         page: 'hsl(var(--page) / <alpha-value>)',
-        surface: 'hsl(var(--surface) / <alpha-value>)',
+        surface: {
+          DEFAULT: 'hsl(var(--surface) / <alpha-value>)',
+          sunk: 'hsl(var(--surface-sunk) / <alpha-value>)',
+        },
         foreground: 'hsl(var(--foreground) / <alpha-value>)',
         muted: {
           DEFAULT: 'hsl(var(--muted) / <alpha-value>)',
@@ -51,6 +54,18 @@ export default {
         },
         nodata: 'hsl(var(--no-data) / <alpha-value>)',
 
+        // The score ramp: one hue, light -> dark. Magnitude only — a 1–5
+        // score, a share, a maturity step. Never identity, never status.
+        // Reach it through the ordinal helpers in src/lib/bands.ts rather
+        // than naming a step at a call site.
+        score: {
+          1: 'hsl(var(--s1) / <alpha-value>)',
+          2: 'hsl(var(--s2) / <alpha-value>)',
+          3: 'hsl(var(--s3) / <alpha-value>)',
+          4: 'hsl(var(--s4) / <alpha-value>)',
+          5: 'hsl(var(--s5) / <alpha-value>)',
+        },
+
         // The five-level maturity ramp (Nascent → Optimized). A finer scale
         // than the three readiness bands above, for the surfaces that report a
         // maturity level. Reach it through MATURITY_CLASSES / maturityColor()
@@ -76,12 +91,19 @@ export default {
         sm: 'calc(var(--radius) - 4px)',
       },
       boxShadow: {
-        card: '0 1px 2px 0 rgb(0 0 0 / 0.04), 0 1px 3px 0 rgb(0 0 0 / 0.06)',
+        // Deliberately none: hierarchy is hairlines and vertical rhythm. Kept
+        // as a token rather than deleted so the existing `shadow-card` call
+        // sites keep resolving while they are ported.
+        card: 'none',
+        sheet: '0 1px 2px rgb(0 0 0 / 0.05), 0 8px 24px -12px rgb(0 0 0 / 0.18)',
         // Anything that floats above the page: popovers, dialogs, drawers, toasts.
         pop: '0 4px 12px -2px rgb(0 0 0 / 0.10), 0 12px 32px -8px rgb(0 0 0 / 0.18)',
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
+        // Two voices. Prose in a humanist grotesque; every label, tick, figure
+        // column and code fragment in the mono, so readings look like readings.
+        sans: ['Avenir Next', 'Segoe UI', 'Roboto', 'system-ui', '-apple-system', 'sans-serif'],
+        mono: ['ui-monospace', 'SF Mono', 'SFMono-Regular', 'Menlo', 'Consolas', 'monospace'],
       },
       // Overlay entrances. Kept in CSS rather than a motion library: these are
       // the only animations in the app, and the reduced-motion rule in

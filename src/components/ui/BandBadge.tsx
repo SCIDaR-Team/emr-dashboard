@@ -2,11 +2,9 @@ import { Check, CircleSlash, Minus } from 'lucide-react';
 import {
   BAND_CLASSES,
   BAND_LABEL,
-  MATURITY_CLASSES,
-  MATURITY_LABEL,
-  toMaturityLevel,
 } from '@/lib/bands';
 import { cn } from '@/lib/cn';
+import { MaturityMeter } from './Meter';
 import type { Band } from '@/lib/types';
 
 /**
@@ -123,35 +121,19 @@ interface MaturityBadgeProps {
  * This is not the readiness scale and does not replace it. A facility's overall
  * archetype pill stays on `BandBadge`'s three colours.
  */
+/**
+ * The five-level maturity label.
+ *
+ * Delegates to `MaturityMeter`: maturity is an ordered scale of the same 1–5
+ * score, so it rides the score ramp as a five-step position indicator rather
+ * than a coloured pill. The pill used to be tinted from a red→green maturity
+ * rainbow, which sat beside the three readiness colours meaning something
+ * different and taught neither scale — and now that those tokens resolve to
+ * the blue ramp, a tinted label would also be pale-on-pale.
+ */
 export function MaturityBadge({ score, size = 'md', className }: MaturityBadgeProps) {
-  const level = toMaturityLevel(score);
-  if (!level) {
-    return (
-      <span
-        className={cn(
-          'inline-flex items-center rounded-full bg-muted font-medium text-muted-foreground',
-          size === 'sm' ? 'px-2 py-0.5 text-xs' : 'px-3 py-1 text-sm',
-          className,
-        )}
-      >
-        No data
-      </span>
-    );
-  }
-
-  const classes = MATURITY_CLASSES[level];
-
   return (
-    <span
-      className={cn(
-        'inline-flex items-center rounded-full font-medium',
-        classes.wash,
-        classes.text,
-        size === 'sm' ? 'px-2 py-0.5 text-xs' : 'px-3 py-1 text-sm',
-        className,
-      )}
-    >
-      {MATURITY_LABEL[level]}
-    </span>
+    <MaturityMeter score={score} size={size === 'sm' ? 'sm' : 'lg'} className={className} />
   );
 }
+
