@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, type CSSProperties } from 'react';
 import {
   ClipboardList,
   FileImage,
@@ -453,6 +453,17 @@ function FacilityPicker({ facilities }: { facilities: FacilitySummary[] }) {
 }
 
 /**
+ * Width of the verdict column — the score, and the maturity meter under it.
+ *
+ * It is a CSS variable rather than a constant in the class strings because two
+ * places have to agree on it: the header's overall meter and the grid template
+ * every theme row is laid out on. Tailwind's scanner only sees class literals,
+ * so a JS constant interpolated into them would compile to nothing; a variable
+ * keeps both call sites reading one number.
+ */
+const VERDICT_COLUMN = { '--gate-verdict-w': '172px' } as CSSProperties;
+
+/**
  * The verdict, and why.
  *
  * The average domain score used to be the largest number on this page. It does
@@ -473,7 +484,7 @@ function GatePanel({ facility }: { facility: Facility }) {
   const core = coreScores.length ? Math.min(...coreScores) : null;
 
   return (
-    <div className="card">
+    <div className="card" style={VERDICT_COLUMN}>
       <header className="flex flex-wrap items-start justify-between gap-4 border-b border-border px-4 py-3.5">
         <div className="min-w-0">
           <p className="mono text-[10px] uppercase tracking-[0.11em] text-muted-foreground">
@@ -488,7 +499,17 @@ function GatePanel({ facility }: { facility: Facility }) {
         <div className="shrink-0 text-right">
           <BandBadge band={facility.archetype} />
           <div className="mt-1.5 flex justify-end">
-            <MaturityBadge score={facility.averageDomainScore} size="sm" />
+            {/* Sized to the verdict column, not to its label, so the facility's
+                own meter starts on the same line as the four theme meters
+                below it. Left to shrink-wrap it drifts with whatever label the
+                facility lands on — Nascent sits 82px right of Institutionalized
+                — and the header reads as belonging to a different card. */}
+            <MaturityBadge
+              score={facility.averageDomainScore}
+              size="sm"
+              className="flex w-auto sm:w-[var(--gate-verdict-w)]"
+              labelClassName="sm:flex-1 sm:text-right"
+            />
           </div>
         </div>
       </header>
@@ -505,12 +526,13 @@ function GatePanel({ facility }: { facility: Facility }) {
              than sized to content: `auto` let the longest maturity label —
              INSTITUTIONALIZED against OPTIMIZED — steal width from the track,
              and four bars that stop at four different points cannot be read
-             against each other or against the cut hairline. */
+             against each other or against the cut hairline. Same width as the
+             header's meter, so the whole column lines up. */
           return (
             <div
               key={theme.id}
               className={cn(
-                'grid items-center gap-4 border-b border-border py-2.5 last:border-b-0 sm:grid-cols-[176px_1fr_172px]',
+                'grid items-center gap-4 border-b border-border py-2.5 last:border-b-0 sm:grid-cols-[176px_1fr_var(--gate-verdict-w)]',
                 failing && '-mx-4 bg-notready-wash px-4',
               )}
             >
