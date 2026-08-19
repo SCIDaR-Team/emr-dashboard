@@ -1,0 +1,1518 @@
+<title>EMR Readiness Ledger</title>
+
+<style>
+/* ═══════════════════════════════════════════════════════════════════════
+   TOKENS
+
+   Two colour systems, deliberately separated — this is the core fix.
+
+   1. READINESS BANDS (green / amber / red) are STATUS. They are the only
+      saturated hues on the page, so colour always means readiness and
+      nothing else. Each is paired with a texture and a label, because
+      red↔green sits in the CVD warn band (all-pairs ΔE 7.0–7.6) and must
+      never carry meaning by hue alone.
+   2. SCORE MAGNITUDE is a single-hue blue ordinal ramp — validated
+      monotone, ≥2:1 at the light end, hue spread 3°. Blue also carries
+      every interactive affordance, which is what frees green up.
+
+   Neutrals are biased slightly green so they read as chosen rather than
+   inherited, and so they sit under the brand without competing with it.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+:root {
+  color-scheme: light;
+
+  /* Neutrals — green-biased paper and ink */
+  --paper:        #f5f6f4;
+  --surface:      #fdfdfc;
+  --surface-sunk: #eef0ec;
+  --ink:          #131816;
+  --ink-2:        #565e59;
+  --ink-3:        #878f89;
+  --rule:         #e3e6e2;
+  --rule-2:       #d0d5cf;
+
+  /* Readiness bands — status. Fixed meaning, never a series colour. */
+  --ready:      #0e7a4f;
+  --moderate:   #d4930b;
+  --notready:   #c33f2e;
+  --nodata:     #b9c0ba;
+
+  /* Band washes, for row tints and chips */
+  --ready-wash:    #e6f2eb;
+  --moderate-wash: #fbf1dc;
+  --notready-wash: #f9e8e5;
+
+  /* Score magnitude — one hue, light→dark. Also the accent. */
+  --accent:     #2a78d6;
+  --accent-ink: #1c5cab;
+  --s1:         #86b6ef;
+  --s2:         #5598e7;
+  --s3:         #2a78d6;
+  --s4:         #1c5cab;
+  --s5:         #104281;
+
+  /* Texture ink — a fixed dark, because band hues barely move between
+     themes and a texture taken from --ink would invert against a
+     background that did not. */
+  --tex: rgba(0,0,0,.42);
+
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: "Avenir Next", "Segoe UI", Roboto, system-ui, -apple-system, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper:        #0e1110;
+    --surface:      #181c1a;
+    --surface-sunk: #212724;
+    --ink:          #eef1ef;
+    --ink-2:        #a9b1ac;
+    --ink-3:        #7d857f;
+    --rule:         #272c29;
+    --rule-2:       #363d38;
+
+    --ready:      #2f9e6b;
+    --moderate:   #e0a828;
+    --notready:   #e1614d;
+    --nodata:     #454d47;
+
+    --ready-wash:    #14261e;
+    --moderate-wash: #2a2213;
+    --notready-wash: #2c1a17;
+
+    --accent:     #5b9ceb;
+    --accent-ink: #86b6ef;
+    --s1:         #184f95;
+    --s2:         #256abf;
+    --s3:         #3987e5;
+    --s4:         #6da7ec;
+    --s5:         #b7d3f6;
+
+    --tex: rgba(0,0,0,.55);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper:        #0e1110;
+  --surface:      #181c1a;
+  --surface-sunk: #212724;
+  --ink:          #eef1ef;
+  --ink-2:        #a9b1ac;
+  --ink-3:        #7d857f;
+  --rule:         #272c29;
+  --rule-2:       #363d38;
+
+  --ready:      #2f9e6b;
+  --moderate:   #e0a828;
+  --notready:   #e1614d;
+  --nodata:     #454d47;
+
+  --ready-wash:    #14261e;
+  --moderate-wash: #2a2213;
+  --notready-wash: #2c1a17;
+
+  --accent:     #5b9ceb;
+  --accent-ink: #86b6ef;
+  --s1:         #184f95;
+  --s2:         #256abf;
+  --s3:         #3987e5;
+  --s4:         #6da7ec;
+  --s5:         #b7d3f6;
+
+  --tex: rgba(0,0,0,.55);
+}
+
+/* ── Reset-ish ─────────────────────────────────────────────────────── */
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    transition-duration: .01ms !important;
+  }
+}
+
+/* ── Layout: full-bleed ruled bands, a ledger ──────────────────────── */
+.band {
+  border-bottom: 1px solid var(--rule);
+  background: var(--surface);
+}
+.band--sunk { background: var(--paper); }
+
+.wrap {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 32px;
+}
+@media (max-width: 640px) { .wrap { padding: 0 18px; } }
+
+.beat { padding: 52px 0 60px; }
+.beat--tight { padding: 34px 0 40px; }
+
+/* ── Type roles ────────────────────────────────────────────────────── */
+
+/* Mono is the instrument voice: every label, tick, eyebrow and column. */
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin: 0 0 6px;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.eyebrow b {
+  color: var(--accent);
+  font-weight: 600;
+  letter-spacing: .1em;
+}
+
+.lede {
+  font-size: clamp(26px, 4.1vw, 43px);
+  line-height: 1.14;
+  letter-spacing: -.021em;
+  font-weight: 600;
+  margin: 0 0 18px;
+  text-wrap: balance;
+  max-width: 22ch;
+}
+.lede em {
+  font-style: normal;
+  color: var(--notready);
+}
+
+h2.h {
+  font-size: clamp(21px, 2.5vw, 27px);
+  line-height: 1.2;
+  letter-spacing: -.014em;
+  font-weight: 600;
+  margin: 0 0 10px;
+  text-wrap: balance;
+}
+h3.sub {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -.006em;
+  margin: 0 0 3px;
+}
+
+p.note {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 14px;
+  max-width: 66ch;
+}
+p.note + p.note { margin-top: 10px; }
+
+.fine {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--ink-3);
+  max-width: 78ch;
+}
+
+/* Figures: the sans, tight, tabular only where columns align. */
+.fig {
+  font-size: clamp(38px, 5.4vw, 58px);
+  line-height: .94;
+  font-weight: 600;
+  letter-spacing: -.035em;
+}
+.fig small {
+  font-size: .34em;
+  font-weight: 500;
+  letter-spacing: -.01em;
+  color: var(--ink-3);
+}
+.num { font-variant-numeric: tabular-nums; }
+
+/* ── Header ────────────────────────────────────────────────────────── */
+.masthead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 0 18px;
+}
+.wordmark {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink);
+  font-weight: 600;
+}
+.wordmark span { color: var(--ink-3); font-weight: 400; }
+.stamp {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  border: 1px solid var(--rule-2);
+  padding: 4px 9px;
+}
+
+/* ── Band swatches & legend ────────────────────────────────────────── */
+.tex-ready    { background: var(--ready); }
+.tex-moderate {
+  background-color: var(--moderate);
+  background-image: radial-gradient(var(--tex) .85px, transparent 1px);
+  background-size: 4px 4px;
+}
+.tex-notready {
+  background-color: var(--notready);
+  background-image: repeating-linear-gradient(135deg, transparent 0 2px, var(--tex) 2px 3.4px);
+}
+.tex-nodata {
+  background-color: var(--surface-sunk);
+  background-image: repeating-linear-gradient(45deg, transparent 0 4px, var(--nodata) 4px 6px);
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 22px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .04em;
+  color: var(--ink-2);
+}
+.legend li { display: flex; align-items: center; gap: 7px; }
+.legend i {
+  width: 22px; height: 9px;
+  flex: none;
+  display: block;
+}
+
+/* ── Beat 00: the finding ──────────────────────────────────────────── */
+.thesis {
+  display: grid;
+  grid-template-columns: minmax(0,1.05fr) minmax(0,.95fr);
+  gap: 44px;
+  align-items: start;
+}
+@media (max-width: 860px) { .thesis { grid-template-columns: 1fr; gap: 32px; } }
+
+.waffle {
+  display: grid;
+  grid-template-columns: repeat(20, 1fr);
+  gap: 2px;               /* 2px surface gap between fills, not borders */
+  margin: 0 0 12px;
+}
+.waffle i {
+  display: block;
+  aspect-ratio: 1;
+  border-radius: 1px;
+}
+
+.tallies {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0,1fr));
+  gap: 1px;
+  background: var(--rule);
+  border: 1px solid var(--rule);
+  margin-top: 26px;
+}
+.tally {
+  background: var(--surface);
+  padding: 13px 14px 15px;
+}
+.tally .k {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 9px;
+}
+.tally .k i { width: 16px; height: 8px; flex: none; display: block; }
+.tally .v {
+  font-size: 27px;
+  font-weight: 600;
+  letter-spacing: -.028em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.tally .v s {
+  text-decoration: none;
+  font-size: 13px;
+  color: var(--ink-3);
+  font-weight: 500;
+  margin-left: 6px;
+  letter-spacing: 0;
+}
+.tally .a {
+  margin-top: 7px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+
+/* Two facing extremes — the counter-finding */
+.poles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--rule);
+  border: 1px solid var(--rule);
+  margin-top: 26px;
+}
+@media (max-width: 560px) { .poles { grid-template-columns: 1fr; } }
+.pole { background: var(--surface); padding: 15px 16px 17px; }
+.pole .k {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 10px;
+}
+.pole .v {
+  font-size: 30px; font-weight: 600; line-height: 1;
+  letter-spacing: -.03em; font-variant-numeric: tabular-nums;
+}
+.pole .v s { text-decoration: none; font-size: 13px; color: var(--ink-3); font-weight: 500; margin-left: 4px; }
+.pole .n { margin-top: 8px; font-size: 13.5px; font-weight: 600; }
+.pole .d { margin-top: 3px; font-size: 12.5px; color: var(--ink-2); }
+
+/* ── Small multiples: sub-theme scores ─────────────────────────────── */
+.sm-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(292px, 1fr));
+  gap: 1px;
+  background: var(--rule);
+  border: 1px solid var(--rule);
+  margin-top: 26px;
+}
+/* Flex column with .rows growing, so every panel's axis sits on the panel
+   floor and the four axes line up across a row of unequal-length domains. */
+.sm {
+  background: var(--surface);
+  padding: 16px 18px 18px;
+  display: flex;
+  flex-direction: column;
+}
+.sm > header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 11px;
+  margin-bottom: 13px;
+  border-bottom: 1px solid var(--rule);
+}
+.sm > header .t { font-size: 13.5px; font-weight: 600; letter-spacing: -.004em; }
+.sm > header .s {
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.01em;
+}
+.sm > header .s u {
+  text-decoration: none;
+  font-size: 10px;
+  color: var(--ink-3);
+  letter-spacing: .08em;
+  margin-left: 3px;
+}
+
+.rows { display: flex; flex-direction: column; gap: 9px; flex: 1 0 auto; }
+.row2 { display: grid; grid-template-columns: 1fr; gap: 3px; }
+.row2 .lab {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+.row2 .lab b {
+  font-family: var(--mono);
+  font-weight: 600;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+/* The plot: 1→5, anchored at 1 because 1 is the rubric floor (no facility
+   can score 0). Axis is labelled so the anchor is never implicit. */
+.track {
+  position: relative;
+  height: 7px;
+  background: var(--surface-sunk);
+  border-radius: 1px;
+}
+/* One series, one colour. The bar's length already encodes the score, so
+   tinting it by that same score would spend the hue channel on information
+   the chart has already given — and the mean line is what the eye needs
+   instead. Attention is directed at the panel level, not the bar level. */
+.track > b {
+  position: absolute;
+  inset: 0 auto 0 0;
+  display: block;
+  border-radius: 0 3px 3px 0;   /* 4px-ish rounded data end */
+  background: var(--s3);
+}
+
+/* Mean reference marker — a solid hairline, never dashed. Drawn above the
+   fill and extended past the track, so it stays legible where a bar crosses
+   it: the ticks in the gutter carry the reading when the line itself is
+   covered by the blue. */
+.track > u {
+  position: absolute;
+  top: -4px; bottom: -4px;
+  width: 1px;
+  background: var(--ink-2);
+  text-decoration: none;
+  z-index: 1;
+}
+
+.axis {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: .06em;
+  color: var(--ink-3);
+  margin-top: 11px;
+  padding-top: 8px;
+  border-top: 1px solid var(--rule);
+}
+
+.sm--flag { background: var(--notready-wash); }
+
+/* Leadership & Governance is not a peer of the other four: it has no
+   sub-themes and is scored at state level. Giving it an equal panel left a
+   hole in the grid and implied a parity that isn't there. It gets its own
+   full-width strip, which is both honest and roomier. */
+.lead-strip {
+  display: grid;
+  grid-template-columns: minmax(0,190px) minmax(0,1fr) minmax(0,300px);
+  gap: 26px;
+  align-items: center;
+  background: var(--surface-sunk);
+  border: 1px solid var(--rule);
+  border-top: 0;
+  border-left: 2px solid var(--notready);
+  padding: 18px 20px 20px;
+}
+@media (max-width: 780px) {
+  .lead-strip { grid-template-columns: 1fr; gap: 14px; align-items: start; }
+}
+.lead-strip .hd .t { font-size: 13.5px; font-weight: 600; }
+.lead-strip .hd u {
+  text-decoration: none; display: block; font-family: var(--mono);
+  font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--ink-3); margin-top: 3px;
+}
+.lead-strip .big {
+  font-size: 40px; font-weight: 600; line-height: 1;
+  letter-spacing: -.032em; font-variant-numeric: tabular-nums;
+  margin-top: 8px;
+}
+.lead-strip .big s {
+  text-decoration: none; font-size: 14px; color: var(--ink-3);
+  font-weight: 500; margin-left: 3px;
+}
+.floors {
+  display: flex; flex-wrap: wrap; gap: 5px;
+}
+.floors span {
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: .06em;
+  border: 1px solid var(--rule-2); padding: 3px 7px; color: var(--ink-2);
+  background: var(--surface);
+}
+
+/* ── Ranked state ledger ───────────────────────────────────────────── */
+.scroller { overflow-x: auto; margin-top: 24px; }
+
+table.ledger {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+table.ledger thead th {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-weight: 400;
+  text-align: left;
+  padding: 0 12px 9px 0;
+  border-bottom: 1px solid var(--rule-2);
+  white-space: nowrap;
+}
+table.ledger thead th.r { text-align: right; padding-right: 0; }
+table.ledger tbody td {
+  padding: 11px 12px 11px 0;
+  border-bottom: 1px solid var(--rule);
+  vertical-align: middle;
+}
+table.ledger tbody td.r {
+  text-align: right;
+  padding-right: 0;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
+}
+table.ledger tbody tr:hover td { background: var(--surface-sunk); }
+table.ledger .st { font-weight: 600; white-space: nowrap; }
+table.ledger .rk {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-3);
+  width: 26px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 100% stacked band bar — 2px surface gaps, textures, no borders */
+.stack {
+  display: flex;
+  gap: 2px;
+  height: 13px;
+  min-width: 190px;
+}
+.stack > i { display: block; border-radius: 1px; }
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  padding: 3px 8px 3px 6px;
+  border: 1px solid var(--rule-2);
+  white-space: nowrap;
+}
+.chip i { width: 12px; height: 8px; flex: none; display: block; }
+.chip--ready    { background: var(--ready-wash); }
+.chip--moderate { background: var(--moderate-wash); }
+.chip--notready { background: var(--notready-wash); }
+
+/* Callout — an observation the data forces, set apart */
+.callout {
+  border-left: 2px solid var(--accent);
+  padding: 2px 0 2px 18px;
+  margin-top: 26px;
+  max-width: 74ch;
+}
+.callout .k {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 5px;
+}
+.callout p { margin: 0; font-size: 14px; color: var(--ink-2); }
+.callout p b { color: var(--ink); font-weight: 600; }
+
+/* ── Cost ──────────────────────────────────────────────────────────── */
+.cost {
+  display: grid;
+  grid-template-columns: minmax(0,.85fr) minmax(0,1.15fr);
+  gap: 44px;
+  align-items: start;
+  margin-top: 26px;
+}
+@media (max-width: 860px) { .cost { grid-template-columns: 1fr; gap: 32px; } }
+
+.dbars { display: flex; flex-direction: column; gap: 13px; margin-top: 22px; }
+.dbar .lab {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  font-size: 13px; margin-bottom: 4px;
+}
+.dbar .lab b {
+  font-family: var(--mono); font-size: 12.5px; font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.dbar .t { height: 9px; background: var(--surface-sunk); border-radius: 1px; }
+.dbar .t > i { display: block; height: 100%; background: var(--s3); border-radius: 0 3px 3px 0; }
+.dbar.none .t > i { background: var(--nodata); }
+.dbar.none .lab { color: var(--ink-3); }
+
+table.acts { width: 100%; min-width: 480px; border-collapse: collapse; font-size: 13.5px; }
+table.acts thead th {
+  font-family: var(--mono); font-size: 10px; letter-spacing: .11em;
+  text-transform: uppercase; color: var(--ink-3); font-weight: 400;
+  text-align: left; padding: 0 12px 9px 0; border-bottom: 1px solid var(--rule-2);
+  white-space: nowrap;
+}
+table.acts thead th.r { text-align: right; padding-right: 0; }
+table.acts tbody td { padding: 9px 12px 9px 0; border-bottom: 1px solid var(--rule); }
+table.acts tbody td.r {
+  text-align: right; padding-right: 0; font-family: var(--mono);
+  font-variant-numeric: tabular-nums; font-size: 12.5px; white-space: nowrap;
+}
+table.acts tbody tr:hover td { background: var(--surface-sunk); }
+.pri {
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: .1em;
+  text-transform: uppercase; padding: 2px 6px; border: 1px solid var(--rule-2);
+  color: var(--ink-2);
+}
+.pri--high { border-color: var(--notready); color: var(--notready); }
+
+/* mini share bar inside a cell */
+.share { height: 6px; background: var(--surface-sunk); border-radius: 1px; min-width: 64px; }
+.share > i { display: block; height: 100%; background: var(--s3); border-radius: 0 2px 2px 0; }
+
+/* ── Beat 04: the facility gate ────────────────────────────────────── */
+.card {
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  margin-top: 26px;
+}
+.card > header {
+  padding: 18px 22px 17px;
+  border-bottom: 1px solid var(--rule);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 26px;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.card > header .who .p {
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: .11em;
+  text-transform: uppercase; color: var(--ink-3); margin-bottom: 5px;
+}
+.card > header .who .n { font-size: 19px; font-weight: 600; letter-spacing: -.014em; }
+.card > header .who .m { margin-top: 4px; font-size: 12.5px; color: var(--ink-2); }
+
+.verdict { text-align: right; }
+.verdict .why {
+  margin-top: 7px; font-size: 12.5px; color: var(--ink-2);
+  max-width: 34ch; margin-left: auto;
+}
+
+/* The gate chain: what actually decides the verdict */
+.gates { padding: 20px 22px 22px; }
+.gate-row {
+  display: grid;
+  grid-template-columns: 168px 1fr auto;
+  gap: 16px;
+  align-items: center;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--rule);
+}
+.gate-row:last-child { border-bottom: 0; }
+@media (max-width: 620px) { .gate-row { grid-template-columns: 1fr; gap: 6px; } }
+
+.gate-row .g-name { font-size: 13.5px; font-weight: 600; }
+.gate-row .g-name u {
+  text-decoration: none; display: block; font-family: var(--mono);
+  font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--ink-3); font-weight: 400; margin-top: 2px;
+}
+.gate-row .g-val {
+  font-family: var(--mono); font-size: 13px; font-weight: 600;
+  font-variant-numeric: tabular-nums; text-align: right; min-width: 58px;
+}
+.gate-row.fail { background: var(--notready-wash); margin: 0 -22px; padding: 11px 22px; }
+
+/* threshold-marked track */
+.gt { position: relative; height: 9px; background: var(--surface-sunk); border-radius: 1px; }
+.gt > b { position: absolute; inset: 0 auto 0 0; display: block; border-radius: 0 3px 3px 0; }
+.gt > u {
+  position: absolute; top: -4px; bottom: -4px; width: 1px;
+  background: var(--ink-3); text-decoration: none;
+}
+
+.gate-note {
+  margin: 18px -22px -22px;
+  padding: 15px 22px 17px;
+  border-top: 1px solid var(--rule);
+  background: var(--surface-sunk);
+  font-size: 13.5px;
+  color: var(--ink-2);
+}
+.gate-note b { color: var(--ink); font-weight: 600; }
+.gate-note code {
+  font-family: var(--mono); font-size: 12px;
+  background: var(--surface); border: 1px solid var(--rule);
+  padding: 1px 5px;
+}
+
+/* requirement grid */
+.reqs { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 1px;
+        background: var(--rule); border-top: 1px solid var(--rule); }
+.reqcol { background: var(--surface); padding: 15px 18px 17px; }
+.reqcol h4 {
+  font-family: var(--mono); font-size: 10px; letter-spacing: .11em;
+  text-transform: uppercase; color: var(--ink-3); font-weight: 400;
+  margin: 0 0 11px;
+}
+.reqcol ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+.reqcol li { display: grid; grid-template-columns: 14px 1fr; gap: 9px; font-size: 12.5px; align-items: start; }
+.reqcol li svg { margin-top: 3px; }
+.reqcol li.miss { color: var(--ink); }
+.reqcol li.have { color: var(--ink-3); }
+.reqcol li.unk  { color: var(--ink-3); font-style: italic; }
+
+/* ── Design-language band ──────────────────────────────────────────── */
+.lang { display: grid; grid-template-columns: repeat(auto-fit, minmax(258px, 1fr)); gap: 1px;
+        background: var(--rule); border: 1px solid var(--rule); margin-top: 24px; }
+.langcol { background: var(--surface); padding: 17px 19px 19px; }
+.langcol h4 {
+  font-family: var(--mono); font-size: 10px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--accent); font-weight: 600; margin: 0 0 11px;
+}
+.langcol p { margin: 0 0 9px; font-size: 13px; color: var(--ink-2); }
+.langcol p:last-child { margin-bottom: 0; }
+.langcol b { color: var(--ink); font-weight: 600; }
+
+.swatches { display: flex; gap: 3px; margin: 0 0 12px; }
+.swatches i { display: block; height: 26px; flex: 1; border-radius: 1px; }
+
+.typerow { border-top: 1px solid var(--rule); padding-top: 10px; margin-top: 10px; }
+.typerow:first-of-type { border-top: 0; padding-top: 0; margin-top: 0; }
+.typerow .r {
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: .11em;
+  text-transform: uppercase; color: var(--ink-3); margin-bottom: 3px;
+}
+
+/* ── Data-table disclosure (accessibility path) ────────────────────── */
+details.tv { margin-top: 20px; }
+details.tv > summary {
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--accent); cursor: pointer;
+  padding: 6px 0; list-style: none; display: inline-flex; align-items: center; gap: 7px;
+}
+details.tv > summary::-webkit-details-marker { display: none; }
+details.tv > summary::before { content: "+"; font-weight: 600; }
+details.tv[open] > summary::before { content: "–"; }
+details.tv > div { overflow-x: auto; padding-top: 8px; }
+table.plain { width: 100%; min-width: 440px; border-collapse: collapse; font-size: 12.5px; }
+table.plain th, table.plain td {
+  text-align: left; padding: 7px 14px 7px 0; border-bottom: 1px solid var(--rule);
+  font-family: var(--mono); font-variant-numeric: tabular-nums;
+}
+table.plain th { color: var(--ink-3); font-weight: 400; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
+table.plain td.r, table.plain th.r { text-align: right; padding-right: 0; }
+
+/* ── Tooltip ───────────────────────────────────────────────────────── */
+#tip {
+  position: fixed;
+  z-index: 60;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -100%);
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.45;
+  letter-spacing: .02em;
+  padding: 6px 9px;
+  white-space: pre;
+  border-radius: 2px;
+  transition: opacity .1s ease-out;
+}
+#tip.on { opacity: 1; }
+
+footer.foot { padding: 26px 0 40px; }
+</style>
+
+<div id="tip" role="status" aria-live="polite"></div>
+
+<!-- ══════════════════ MASTHEAD ══════════════════ -->
+<div class="band">
+  <div class="wrap masthead">
+    <div class="wordmark">NPHCDA &nbsp;<span>/ EMR readiness assessment</span></div>
+    <div class="stamp">Design direction · prototype</div>
+  </div>
+</div>
+
+<!-- ══════════════════ 00 · THE FINDING ══════════════════ -->
+<div class="band">
+  <div class="wrap beat">
+    <p class="eyebrow"><b>00</b> The finding</p>
+
+    <div class="thesis">
+      <div>
+        <h1 class="lede">Nigeria's health facilities are ready in people and <em>unready in power</em>.</h1>
+        <p class="note">
+          Of 2,804 facilities assessed across 12 states, 110 can run an electronic
+          medical record today. The constraint is not staff willingness or data
+          habits — both score near the top of the instrument. It is electricity,
+          connectivity and backup: the things that keep a system running rather
+          than the things that start it.
+        </p>
+
+        <div class="poles">
+          <div class="pole">
+            <div class="k">Strongest sub-theme</div>
+            <div class="v">4.58<s>/5</s></div>
+            <div class="n">Change readiness</div>
+            <div class="d">Staff expect and accept the transition to digital records.</div>
+          </div>
+          <div class="pole">
+            <div class="k">Weakest sub-theme</div>
+            <div class="v">1.50<s>/5</s></div>
+            <div class="n">Connectivity resilience</div>
+            <div class="d">Almost no facility has a fallback when the primary link drops.</div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <p class="eyebrow" style="margin-bottom:10px">Every hundred facilities</p>
+        <div class="waffle" id="waffle" aria-hidden="true"></div>
+        <p class="fine">
+          One tile is one per cent of the 2,804 facilities with a computed
+          readiness band. Four are ready.
+        </p>
+
+        <div class="tallies">
+          <div class="tally">
+            <div class="k"><i class="tex-ready"></i>Ready</div>
+            <div class="v">110<s>3.9%</s></div>
+            <div class="a">Roll out now</div>
+          </div>
+          <div class="tally">
+            <div class="k"><i class="tex-moderate"></i>Moderate</div>
+            <div class="v">1,246<s>44.4%</s></div>
+            <div class="a">Targeted fixes</div>
+          </div>
+          <div class="tally">
+            <div class="k"><i class="tex-notready"></i>Not ready</div>
+            <div class="v">1,448<s>51.6%</s></div>
+            <div class="a">Foundational build</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ 01 · WHERE THE GAP IS ══════════════════ -->
+<div class="band band--sunk">
+  <div class="wrap beat">
+    <p class="eyebrow"><b>01</b> Where the gap is</p>
+    <h2 class="h">Nineteen sub-themes, ranked inside their domain</h2>
+    <p class="note">
+      The national average is 3.53. Read each panel against that line: Technical
+      Infrastructure sits almost entirely to its left, Data Use almost entirely
+      to its right. That asymmetry is the whole finding, and it is invisible when
+      the five domains are reported only as five averages.
+    </p>
+
+    <div class="sm-grid" id="smGrid"></div>
+    <div class="lead-strip" id="leadStrip"></div>
+
+    <div class="axis" style="border-top:0;margin-top:14px">
+      <span>Bars run from 1 (instrument floor) to 5 — no facility can score 0</span>
+      <span>│ national mean 3.53</span>
+    </div>
+
+    <details class="tv">
+      <summary>Sub-theme scores as a table</summary>
+      <div><table class="plain" id="smTable"></table></div>
+    </details>
+  </div>
+</div>
+
+<!-- ══════════════════ 02 · WHICH STATES ══════════════════ -->
+<div class="band">
+  <div class="wrap beat">
+    <p class="eyebrow"><b>02</b> Which states</p>
+    <h2 class="h">The 12 assessed states, ranked</h2>
+    <p class="note">
+      Composition, not average, is what a deployment plan needs: how many
+      facilities in each state are ready today, and how many need a foundational
+      build first. Bars are shares of that state's facilities.
+    </p>
+
+    <ul class="legend" style="margin-top:18px">
+      <li><i class="tex-ready"></i>Ready</li>
+      <li><i class="tex-moderate"></i>Moderately ready</li>
+      <li><i class="tex-notready"></i>Not ready</li>
+    </ul>
+
+    <div class="scroller">
+      <table class="ledger">
+        <thead>
+          <tr>
+            <th></th>
+            <th>State</th>
+            <th style="min-width:200px">Readiness composition</th>
+            <th class="r">Ready</th>
+            <th class="r">Facilities</th>
+            <th class="r">Avg score</th>
+            <th class="r">Leadership · band</th>
+          </tr>
+        </thead>
+        <tbody id="stateRows"></tbody>
+      </table>
+    </div>
+
+    <div class="callout">
+      <div class="k">Anomaly worth a footnote</div>
+      <p>
+        <b>Jigawa</b> holds 32 of the country's 110 ready facilities — more than
+        any other state, and nearly a third of the national total — while scoring
+        <b>1.0 out of 5</b> on Leadership &amp; Governance, the floor of the
+        instrument. Either facility-level readiness is being produced without
+        state-level governance, or the governance indicator is not measuring what
+        we think it measures. Both readings change the plan.
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ 03 · WHAT IT COSTS ══════════════════ -->
+<div class="band band--sunk">
+  <div class="wrap beat">
+    <p class="eyebrow"><b>03</b> What it costs</p>
+    <h2 class="h">58,115 costed items — and one domain with none</h2>
+
+    <div class="cost">
+      <div>
+        <div class="fig num">58,115<small> items</small></div>
+        <p class="note" style="margin-top:12px">
+          Every remedy the instrument triggers, itemised. Unit costs are pending a
+          signed-off cost table, so this is a volume of work, not yet a budget.
+        </p>
+
+        <p class="eyebrow" style="margin-top:26px">Items by domain</p>
+        <div class="dbars" id="dbars"></div>
+      </div>
+
+      <div>
+        <p class="eyebrow">Actions by facilities affected</p>
+        <div class="scroller">
+          <table class="acts">
+            <thead>
+              <tr>
+                <th>Action</th>
+                <th style="width:90px">Share of 2,804</th>
+                <th class="r">Facilities</th>
+                <th class="r">Priority</th>
+              </tr>
+            </thead>
+            <tbody id="actRows"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout">
+      <div class="k">The hole in the plan</div>
+      <p>
+        <b>Leadership &amp; Governance is the weakest domain nationally at 2.21</b>
+        — and it carries <b>zero</b> costed items, because it is assessed at state
+        level and the instrument only triggers remedies at facility level. The
+        cheapest domain to fix is the one no line item touches.
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ 04 · ONE FACILITY ══════════════════ -->
+<div class="band">
+  <div class="wrap beat">
+    <p class="eyebrow"><b>04</b> One facility</p>
+    <h2 class="h">The scorecard leads with the gate, not the average</h2>
+    <p class="note">
+      A facility's average domain score does not decide its band. Two core
+      domains gate it: if either falls at or below 2.9, the facility is Not ready
+      regardless of how well it does elsewhere. So the average is a decoy, and it
+      should not be the largest number on the page.
+    </p>
+
+    <div class="card">
+      <header>
+        <div class="who">
+          <div class="p">Kosofe LGA · Lagos · Functional L1 · urban</div>
+          <div class="n">Oworo Primary Health Centre</div>
+          <div class="m">5 service points · 5 devices · already using Talamus EMR</div>
+        </div>
+        <div class="verdict">
+          <span class="chip chip--notready"><i class="tex-notready"></i>Not ready</span>
+          <div class="why">Blocked by one core domain. Foundational investment first.</div>
+        </div>
+      </header>
+
+      <div class="gates" id="gates"></div>
+
+      <div class="reqs" id="reqs"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ THE LANGUAGE ══════════════════ -->
+<div class="band band--sunk">
+  <div class="wrap beat">
+    <p class="eyebrow"><b>05</b> The language</p>
+    <h2 class="h">Rules this direction runs on</h2>
+
+    <div class="lang">
+      <div class="langcol">
+        <h4>Colour has one job</h4>
+        <div class="swatches">
+          <i class="tex-ready"></i><i class="tex-moderate"></i><i class="tex-notready"></i><i class="tex-nodata"></i>
+        </div>
+        <p>
+          The three readiness bands are the <b>only saturated hues</b> on the
+          page. Green cannot also be the brand, the button fill and the heading
+          colour — the moment it is, green stops meaning "ready".
+        </p>
+        <p>
+          Each band carries a <b>texture and a label</b> as well as a hue: solid,
+          dotted, hatched. Red↔green measures ΔE 7.0 under deuteranopia, so hue
+          alone is not allowed to carry the meaning.
+        </p>
+      </div>
+
+      <div class="langcol">
+        <h4>Magnitude is blue</h4>
+        <div class="swatches">
+          <i style="background:var(--s1)"></i><i style="background:var(--s2)"></i><i style="background:var(--s3)"></i><i style="background:var(--s4)"></i><i style="background:var(--s5)"></i>
+        </div>
+        <p>
+          Scores use a <b>single-hue ordinal ramp</b>, validated monotone and
+          clear of the surface. Blue also carries every link and active state.
+        </p>
+        <p>
+          So the reader learns two rules and never needs a third: <b>hue means
+          band, darkness means score</b>. The old five-colour maturity rainbow
+          collided with the three-band scale and taught neither.
+        </p>
+      </div>
+
+      <div class="langcol">
+        <h4>Two voices</h4>
+        <div class="typerow">
+          <div class="r">Prose · Avenir Next</div>
+          <div style="font-size:17px;font-weight:600;letter-spacing:-.014em">Readiness is a gate</div>
+        </div>
+        <div class="typerow">
+          <div class="r">Instrument · monospace</div>
+          <div style="font-family:var(--mono);font-size:13px;font-variant-numeric:tabular-nums">2.70 / 4.15 → NOT READY</div>
+        </div>
+        <p style="margin-top:12px">
+          Prose in a humanist sans; every <b>label, tick, code and column</b> in
+          monospace. Readings look like readings. Nothing is set in all-caps at
+          display size — the shouting page titles are gone.
+        </p>
+      </div>
+
+      <div class="langcol">
+        <h4>Structure, not decoration</h4>
+        <p>
+          No rounded cards, no drop shadows, no accent rails on tiles. Hierarchy
+          comes from <b>hairlines, vertical rhythm and figure size</b>.
+        </p>
+        <p>
+          The page is <b>an argument in five beats</b> — finding, gap, states,
+          cost, facility. The numbering is real sequence, not ornament. The old
+          home page was a menu duplicating the sidebar; a front page should
+          state the finding.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="band">
+  <div class="wrap foot">
+    <p class="fine">
+      Figures read from the committed ETL output — <code>national.json</code>,
+      <code>states.json</code>, and facility <code>00019879</code> — built
+      2026-08-17 from ERA dataset v4. Gate thresholds and the core/supporting
+      rule are taken from <code>src/lib/archetype.ts</code> and
+      <code>src/lib/bands.ts</code> as written, not restated. Naira costs are
+      omitted because the source workbook has none signed off.
+    </p>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════
+// Tooltip — every mark gets a hover layer, per the chart rules.
+// ═══════════════════════════════════════════════════════════════════════
+(function () {
+  var tip = document.getElementById('tip');
+  document.addEventListener('mouseover', function (e) {
+    var t = e.target.closest('[data-tip]');
+    if (!t) return;
+    tip.textContent = t.getAttribute('data-tip');
+    tip.classList.add('on');
+  });
+  document.addEventListener('mousemove', function (e) {
+    if (!tip.classList.contains('on')) return;
+    tip.style.left = e.clientX + 'px';
+    tip.style.top = (e.clientY - 12) + 'px';
+  });
+  document.addEventListener('mouseout', function (e) {
+    if (e.target.closest('[data-tip]')) tip.classList.remove('on');
+  });
+})();
+
+var MEAN = 3.5348621512948433;
+var pct = function (v) { return ((v - 1) / 4) * 100; };   // 1→5 scale
+var fmt = function (n) { return n.toLocaleString('en-US'); };
+
+// Band of a 1–5 score, using the real cut points from src/lib/bands.ts.
+var bandOf = function (v) { return v <= 2.9 ? 'notready' : (v > 3.9 ? 'ready' : 'moderate'); };
+var bandName = { notready: 'Not ready', moderate: 'Moderately ready', ready: 'Ready' };
+
+/* A small textured mark beside a figure, never the figure recoloured: values
+   stay in ink tokens and the mark carries the band. */
+var bandMark = function (v) {
+  var b = bandOf(v);
+  return '<i class="tex-' + b + '" title="' + bandName[b] + '" style="display:inline-block;' +
+    'width:8px;height:8px;margin-right:7px;vertical-align:baseline;border-radius:1px"></i>';
+};
+
+// ── Waffle ───────────────────────────────────────────────────────────
+(function () {
+  var spec = [['tex-ready', 4, 'Ready'], ['tex-moderate', 44, 'Moderately ready'], ['tex-notready', 52, 'Not ready']];
+  var counts = { 'Ready': '110 facilities · 3.9%', 'Moderately ready': '1,246 facilities · 44.4%', 'Not ready': '1,448 facilities · 51.6%' };
+  var html = '';
+  spec.forEach(function (s) {
+    for (var i = 0; i < s[1]; i++) {
+      html += '<i class="' + s[0] + '" data-tip="' + s[2] + '\n' + counts[s[2]] + '"></i>';
+    }
+  });
+  document.getElementById('waffle').innerHTML = html;
+})();
+
+// ── Small multiples: 19 sub-themes in 4 domains + leadership ─────────
+var DOMAINS = [
+  {
+    name: 'Technical Infrastructure', score: 2.85, flag: true,
+    subs: [
+      ['Power supply', 3.588623395149786],
+      ['Devices', 3.011412268188302],
+      ['Power resilience', 3.0017831669044224],
+      ['Connectivity', 2.554480286738351],
+      ['Device sustainability', 1.9718259629101285],
+      ['Data resilience', 1.8644793152639088],
+      ['Connectivity resilience', 1.5035663338088445]
+    ]
+  },
+  {
+    name: 'Workforce Capacity', score: 3.70, flag: false,
+    subs: [
+      ['Digital familiarity', 4.2881597717546365],
+      ['Digital competency', 3.8865905848787445],
+      ['Roles & accountability', 3.756158514816137],
+      ['Training readiness', 3.342724679029957],
+      ['Technical support', 2.585611510791367]
+    ]
+  },
+  {
+    name: 'Workflow & Transition', score: 3.46, flag: false,
+    subs: [
+      ['Change readiness', 4.5792867981790595],
+      ['Workflow efficiency', 3.54885877318117],
+      ['Documentation integration', 3.1340941512125533],
+      ['Service-point environment', 2.232524964336662]
+    ]
+  },
+  {
+    name: 'Data Use & Reporting', score: 4.09, flag: false,
+    subs: [
+      ['Routine data use', 4.385877318116976],
+      ['Use of routine reports', 4.267475035663338],
+      ['Data-quality review', 3.6476462196861625]
+    ]
+  }
+];
+
+(function () {
+  var host = document.getElementById('smGrid');
+  var html = '';
+
+  DOMAINS.forEach(function (d) {
+    var rows = d.subs.map(function (s) {
+      var v = s[1], p = pct(v);
+      var cls = v <= 2.9 ? 'lo' : (v > 3.9 ? 'hi' : 'mid');
+      var band = v <= 2.9 ? 'Not ready' : (v > 3.9 ? 'Ready' : 'Moderately ready');
+      return '<div class="row2">' +
+        '<div class="lab"><span>' + s[0] + '</span><b>' + v.toFixed(2) + '</b></div>' +
+        '<div class="track ' + cls + '" data-tip="' + s[0] + '\n' + v.toFixed(2) + ' / 5 · ' + band + '\nnational mean 3.53">' +
+        '<b style="width:' + p.toFixed(1) + '%"></b>' +
+        '<u style="left:' + pct(MEAN).toFixed(1) + '%"></u>' +
+        '</div></div>';
+    }).join('');
+
+    html += '<section class="sm' + (d.flag ? ' sm--flag' : '') + '">' +
+      '<header><span class="t">' + d.name + '</span>' +
+      '<span class="s">' + d.score.toFixed(2) + '<u>/5</u></span></header>' +
+      '<div class="rows">' + rows + '</div>' +
+      '<div class="axis"><span>1</span><span>3</span><span>5</span></div>' +
+      '</section>';
+  });
+
+  host.innerHTML = html;
+
+  // Leadership & Governance — no sub-themes, scored at state level. Its own
+  // strip rather than a fifth panel, because it is not a fifth peer.
+  document.getElementById('leadStrip').innerHTML =
+    '<div class="hd">' +
+      '<div class="t">Leadership &amp; Governance</div>' +
+      '<u>no sub-themes · state-scored</u>' +
+      '<div class="big">2.21<s>/5</s></div>' +
+    '</div>' +
+    '<div>' +
+      '<div class="track" data-tip="Leadership &amp; Governance\n2.21 / 5 · Not ready\nscored at state level only">' +
+        '<b style="width:' + pct(2.2083333333333335).toFixed(1) + '%"></b>' +
+        '<u style="left:' + pct(MEAN).toFixed(1) + '%"></u>' +
+      '</div>' +
+      '<div class="axis" style="margin-top:9px;padding-top:7px">' +
+        '<span>1</span><span>national mean 3.53 │</span><span>5</span>' +
+      '</div>' +
+      '<p class="note" style="font-size:13px;margin-top:11px">' +
+        'The weakest domain in the assessment, and the only one with no ' +
+        'sub-themes to diagnose or costed remedy to fund — it is measured at ' +
+        'state level, and the instrument only triggers actions at facility level.' +
+      '</p>' +
+    '</div>' +
+    '<div>' +
+      '<div class="eyebrow" style="margin-bottom:8px">At the instrument floor (1.0)</div>' +
+      '<div class="floors">' +
+        '<span>Jigawa</span><span>Anambra</span><span>Akwa Ibom</span>' +
+      '</div>' +
+      '<p class="fine" style="margin-top:9px">Three of the twelve assessed states ' +
+      'score the minimum possible value.</p>' +
+    '</div>';
+
+  // table view
+  var t = '<thead><tr><th>Domain</th><th>Sub-theme</th><th class="r">Score</th><th class="r">Band</th></tr></thead><tbody>';
+  DOMAINS.forEach(function (d) {
+    d.subs.forEach(function (s) {
+      var v = s[1];
+      t += '<tr><td>' + d.name + '</td><td>' + s[0] + '</td><td class="r">' + v.toFixed(2) +
+        '</td><td class="r">' + (v <= 2.9 ? 'Not ready' : (v > 3.9 ? 'Ready' : 'Moderate')) + '</td></tr>';
+    });
+  });
+  t += '<tr><td>Leadership &amp; Governance</td><td>— (state-level)</td><td class="r">2.21</td><td class="r">Not ready</td></tr>';
+  t += '</tbody>';
+  document.getElementById('smTable').innerHTML = t;
+})();
+
+// ── Ranked states ────────────────────────────────────────────────────
+var STATES = [
+  ['Lagos',      159, 3.77,  8,  65,  86, 4.00],
+  ['Oyo',        257, 3.74, 12, 133, 112, 3.00],
+  ['Nasarawa',   152, 3.71,  2,  88,  62, 1.50],
+  ['Jigawa',     267, 3.70, 32, 180,  55, 1.00],
+  ['Rivers',     144, 3.69, 18,  58,  68, 3.50],
+  ['Anambra',    275, 3.58,  8, 112, 155, 1.00],
+  ['Imo',        227, 3.51,  9,  70, 148, 2.50],
+  ['Adamawa',    200, 3.51,  2, 103,  95, 2.50],
+  ['Bauchi',     179, 3.49,  3,  97,  79, 1.50],
+  ['Kano',       436, 3.48, 14, 234, 188, 3.50],
+  ['Niger',      253, 3.28,  1,  71, 181, 1.50],
+  ['Akwa Ibom',  255, 3.18,  1,  35, 219, 1.00]
+];
+
+(function () {
+  var html = STATES.map(function (s, i) {
+    var name = s[0], n = s[1], avg = s[2], r = s[3], m = s[4], nr = s[5], lead = s[6];
+    var pr = r / n * 100, pm = m / n * 100, pn = nr / n * 100;
+    var tipBase = name + '\n' + fmt(n) + ' facilities\n';
+
+    return '<tr>' +
+      '<td class="rk">' + String(i + 1).padStart(2, '0') + '</td>' +
+      '<td class="st">' + name + '</td>' +
+      '<td><div class="stack">' +
+        '<i class="tex-ready" style="width:' + pr.toFixed(2) + '%" data-tip="' + tipBase + 'Ready ' + r + ' · ' + pr.toFixed(1) + '%"></i>' +
+        '<i class="tex-moderate" style="width:' + pm.toFixed(2) + '%" data-tip="' + tipBase + 'Moderately ready ' + m + ' · ' + pm.toFixed(1) + '%"></i>' +
+        '<i class="tex-notready" style="width:' + pn.toFixed(2) + '%" data-tip="' + tipBase + 'Not ready ' + nr + ' · ' + pn.toFixed(1) + '%"></i>' +
+      '</div></td>' +
+      '<td class="r">' + r + '</td>' +
+      '<td class="r">' + fmt(n) + '</td>' +
+      '<td class="r">' + avg.toFixed(2) + '</td>' +
+      '<td class="r">' + bandMark(lead) + lead.toFixed(2) + '</td>' +
+    '</tr>';
+  }).join('');
+
+  html += '<tr style="background:var(--surface-sunk)">' +
+    '<td class="rk"></td><td class="st">All 12</td>' +
+    '<td><div class="stack">' +
+      '<i class="tex-ready" style="width:3.92%" data-tip="National\nReady 110 · 3.9%"></i>' +
+      '<i class="tex-moderate" style="width:44.44%" data-tip="National\nModerately ready 1,246 · 44.4%"></i>' +
+      '<i class="tex-notready" style="width:51.64%" data-tip="National\nNot ready 1,448 · 51.6%"></i>' +
+    '</div></td>' +
+    '<td class="r">110</td><td class="r">2,804</td><td class="r">3.53</td>' +
+    '<td class="r">' + bandMark(2.2083333333333335) + '2.21</td></tr>';
+
+  document.getElementById('stateRows').innerHTML = html;
+})();
+
+// ── Cost: items by domain ────────────────────────────────────────────
+(function () {
+  var d = [
+    ['Technical Infrastructure', 29644],
+    ['Data Use & Reporting', 12479],
+    ['Workflow & Transition', 8183],
+    ['Workforce Capacity', 7809],
+    ['Leadership & Governance', 0]
+  ];
+  var max = 29644;
+  document.getElementById('dbars').innerHTML = d.map(function (x) {
+    var none = x[1] === 0;
+    return '<div class="dbar' + (none ? ' none' : '') + '">' +
+      '<div class="lab"><span>' + x[0] + '</span><b>' + (none ? 'none' : fmt(x[1])) + '</b></div>' +
+      '<div class="t" data-tip="' + x[0] + '\n' + (none ? 'no costed items' : fmt(x[1]) + ' items · ' + (x[1] / 58115 * 100).toFixed(1) + '% of total') + '">' +
+      '<i style="width:' + (none ? 0 : x[1] / max * 100).toFixed(1) + '%"></i></div></div>';
+  }).join('');
+})();
+
+// ── Cost: top actions ────────────────────────────────────────────────
+(function () {
+  var a = [
+    ['Enable built-in EMR reporting', 2693, 'medium'],
+    ['Procure a printer for the facility', 2688, 'medium'],
+    ['Enable automated data exchange (DHIS2)', 2680, 'medium'],
+    ['Establish a service-improvement feedback loop', 2679, 'medium'],
+    ['Implement data-quality checks', 2657, 'medium'],
+    ['Adopt one shared system across service points', 2636, 'high'],
+    ['Appoint a full-time EMR focal person', 2488, 'high'],
+    ['Equip service points for point-of-care capture', 2455, 'high'],
+    ['Provide digital-literacy training for all staff', 1950, 'high'],
+    ['Procure additional computing devices', 1840, 'high']
+  ];
+  document.getElementById('actRows').innerHTML = a.map(function (x) {
+    var p = x[1] / 2804 * 100;
+    return '<tr>' +
+      '<td>' + x[0] + '</td>' +
+      '<td><div class="share" data-tip="' + x[0] + '\n' + fmt(x[1]) + ' of 2,804 facilities · ' + p.toFixed(0) + '%">' +
+        '<i style="width:' + p.toFixed(1) + '%"></i></div></td>' +
+      '<td class="r">' + fmt(x[1]) + '</td>' +
+      '<td class="r"><span class="pri' + (x[2] === 'high' ? ' pri--high' : '') + '">' + x[2] + '</span></td>' +
+    '</tr>';
+  }).join('');
+})();
+
+// ── Facility gates ───────────────────────────────────────────────────
+(function () {
+  var G = [
+    ['Technical Infrastructure', 'core gate', 2.70, true],
+    ['Workforce Capacity', 'core gate', 4.15, false],
+    ['Workflow & Transition', 'supporting · floor 2.5', null, false],
+    ['Data Use & Reporting', 'supporting · floor 2.5', 4.65, false]
+  ];
+  var CUT = 2.9;
+
+  var rows = G.map(function (g) {
+    var name = g[0], kind = g[1], v = g[2], fail = g[3];
+    if (v === null) {
+      // Not scored is not zero. The no-data hatch says "absent", where a bare
+      // empty track would read as a floor value.
+      return '<div class="gate-row">' +
+        '<div class="g-name">' + name + '<u>' + kind + '</u></div>' +
+        '<div class="gt tex-nodata" data-tip="' + name + '\nnot scored — too few measured indicators"></div>' +
+        '<div class="g-val" style="color:var(--ink-3)">n/s</div>' +
+      '</div>';
+    }
+    var band = v <= 2.9 ? 'Not ready' : (v > 3.9 ? 'Ready' : 'Moderately ready');
+    var fill = v <= 2.9 ? 'var(--notready)' : (v > 3.9 ? 'var(--ready)' : 'var(--moderate)');
+    return '<div class="gate-row' + (fail ? ' fail' : '') + '">' +
+      '<div class="g-name">' + name + '<u>' + kind + '</u></div>' +
+      '<div class="gt" data-tip="' + name + '\n' + v.toFixed(2) + ' / 5 · ' + band + '\ncore gate cuts at 2.9">' +
+        '<b style="width:' + pct(v).toFixed(1) + '%;background:' + fill + '"></b>' +
+        '<u style="left:' + pct(CUT).toFixed(1) + '%"></u>' +
+      '</div>' +
+      '<div class="g-val">' + v.toFixed(2) + '</div>' +
+    '</div>';
+  }).join('');
+
+  rows += '<div class="gate-note">' +
+    'Average domain score is <b>3.83</b> — and it does not matter. ' +
+    'The rule is <code>core = min(2.70, 4.15) = 2.70</code>, and ' +
+    '<code>2.70 ≤ 2.9</code>, so the facility is <b>Not ready</b>. ' +
+    'Technical Infrastructure has to clear 2.9 before anything else counts. ' +
+    'Hairline marks the cut.' +
+    '</div>';
+
+  document.getElementById('gates').innerHTML = rows;
+})();
+
+// ── Requirements ─────────────────────────────────────────────────────
+(function () {
+  var ICON = {
+    miss: '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3.5 3.5l7 7M10.5 3.5l-7 7" stroke="var(--notready)" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg>',
+    have: '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 7.4l2.8 2.8L11 4.4" stroke="var(--ready)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>',
+    unk:  '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3.5 7h7" stroke="var(--nodata)" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg>'
+  };
+  var COLS = [
+    ['Technical Infrastructure — 2 of 6 met', [
+      ['miss', '8–12 hours daily electricity'],
+      ['miss', '1 device per service point'],
+      ['miss', 'A printer for the facility'],
+      ['miss', 'Daily automated data backup'],
+      ['have', 'Safe wiring with dedicated sockets'],
+      ['have', 'No environmental risks']
+    ]],
+    ['Workforce Capacity — 3 of 6 met', [
+      ['miss', 'Training is role-specific'],
+      ['miss', 'Staff are digitally literate'],
+      ['have', 'Full-time EMR focal person'],
+      ['have', 'ICT support person'],
+      ['have', 'Issues resolved in 24–72h'],
+      ['unk',  'All staff receive training — not measured']
+    ]],
+    ['Workflow & Transition — 5 of 6 met', [
+      ['have', 'Records are digitizable'],
+      ['have', 'Documented SOP in place'],
+      ['have', 'Point-of-care capture'],
+      ['have', 'Records shared across points'],
+      ['have', 'No duplicate records'],
+      ['unk',  'Unique patient ID — not measured']
+    ]],
+    ['Data Use & Reporting — 4 of 6 met', [
+      ['miss', 'Built-in reporting enabled'],
+      ['miss', 'Automated data exchange'],
+      ['have', 'Real-time data capture'],
+      ['have', 'Data-quality checks'],
+      ['have', 'Data informs decisions'],
+      ['have', 'Feedback loop in place']
+    ]]
+  ];
+
+  document.getElementById('reqs').innerHTML = COLS.map(function (c) {
+    return '<div class="reqcol"><h4>' + c[0] + '</h4><ul>' +
+      c[1].map(function (r) {
+        return '<li class="' + r[0] + '">' + ICON[r[0]] + '<span>' + r[1] + '</span></li>';
+      }).join('') +
+      '</ul></div>';
+  }).join('');
+})();
+</script>
