@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/layout/PageHeader';
+import type { PageSection } from '@/components/layout/SectionTabs';
 import {
   BandLegend,
   EmptyState,
@@ -27,6 +28,12 @@ import { SUB_THEMES_BY_THEME, THEMES, THEME_BY_ID } from '@/lib/themes';
 import type { Band, FacilityThemeId } from '@/lib/types';
 
 const BAND_ORDER: Band[] = ['ready', 'moderately_ready', 'not_ready'];
+
+/** The tab strip under the header. */
+const SECTIONS: PageSection[] = [
+  { id: 'scores', label: 'Scores' },
+  { id: 'lgas', label: 'LGAs ranked' },
+];
 
 /**
  * Module 3 — Assessed States.
@@ -97,6 +104,7 @@ export default function AssessmentStatesPage() {
       <PageHeader
         title="Assessed States"
         subtitle={`The ${COVERAGE.statesPrimary} states visited, down to LGA`}
+        sections={SECTIONS}
         // Always present, not only after arriving from the map: this page sits
         // one level below National Coverage whichever way the user got here, and
         // a back control that appears conditionally reads as a browser artefact
@@ -188,7 +196,10 @@ export default function AssessmentStatesPage() {
                 sub-themes on the right, changing with the selection — so left to
                 themselves one card always ends short of the other, and the card
                 would resize under the reader every time they switched domain. */}
-            <div className="grid gap-4 xl:grid-cols-2">
+            {/* One section, not two: the pair sits side by side from `xl`, so
+                giving each its own tab would put two entries at the same scroll
+                offset and let the second permanently shadow the first. */}
+            <div id="scores" data-section className="grid gap-4 xl:grid-cols-2">
               <SectionCard
                 title="Domain scores"
                 subtitle={scopeLabel}
@@ -321,6 +332,7 @@ export default function AssessmentStatesPage() {
 
             {facilities.length > 0 && (
               <SectionCard
+                id="lgas"
                 title="LGAs ranked"
                 subtitle={`${formatCount(lgaCount)} LGAs in scope · by average domain score`}
                 action={<BandLegend />}

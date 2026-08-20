@@ -5,6 +5,7 @@ import { InvestmentByStateTable } from './InvestmentByStateTable';
 import { RolloutWaves } from './RolloutWaves';
 import { CheckCircle2, CircleSlash, MinusCircle, MousePointerClick } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
+import type { PageSection } from '@/components/layout/SectionTabs';
 import {
   EmptyState,
   LoadError,
@@ -27,6 +28,15 @@ import { buildShareMap } from '@/lib/scale';
 import { formatCount, formatScore } from '@/lib/format';
 import { THEMES } from '@/lib/themes';
 import type { AreaProfile, Band } from '@/lib/types';
+
+/** The tab strip under the header. Document order, and short enough to sit on
+ *  one line — these are wayfinding labels, not the panels' own headings. */
+const SECTIONS: PageSection[] = [
+  { id: 'readiness', label: 'Readiness by state' },
+  { id: 'ranked', label: 'Ranked' },
+  { id: 'investment', label: 'Investment' },
+  { id: 'waves', label: 'Rollout waves' },
+];
 
 const BAND_ORDER: Band[] = ['ready', 'moderately_ready', 'not_ready'];
 const BAND_ICON: Record<Band, typeof CheckCircle2> = {
@@ -137,7 +147,15 @@ export default function StateSummaryPage() {
     [navigate],
   );
 
-  /** The map, the ranked table and the wave chips: readiness questions. */
+  /**
+   * The map, the ranked table and the wave chips: readiness questions.
+   *
+   * All three land on Assessed States, which is where a state's LGA breakdown
+   * lives. The scope they set is global, so it also reaches the Facility
+   * Scorecard: a user who clicked Oyo here and later opens that page finds its
+   * facility list already narrowed to Oyo, without the map having to route
+   * there itself.
+   */
   const drillIntoState = useCallback(
     (state: AreaProfile) => drillInto(state.name, '/assessment'),
     [drillInto],
@@ -204,6 +222,7 @@ export default function StateSummaryPage() {
       <PageHeader
         title="National Coverage"
         subtitle={`All ${COVERAGE.statesTotal} states and how each was evidenced`}
+        sections={SECTIONS}
       >
         {/* Zone, not State: this page is the national view, and a single state
             belongs to Assessed States. Readiness is passed through FilterBar's
@@ -235,6 +254,7 @@ export default function StateSummaryPage() {
           // strip beneath it actually run horizontally.
           <div className="space-y-5 lg:space-y-6">
             <SectionCard
+              id="readiness"
               title="Readiness by state"
               subtitle={`Among the ${COVERAGE.statesPrimary} states with facility-level findings`}
             >
@@ -339,6 +359,7 @@ export default function StateSummaryPage() {
             </SectionCard>
 
             <SectionCard
+              id="ranked"
               title={
                 visiblePrimaryStates.length === allPrimaryCount
                   ? `The ${COVERAGE.statesPrimary} assessed states, ranked`
@@ -358,6 +379,7 @@ export default function StateSummaryPage() {
             </SectionCard>
 
             <SectionCard
+              id="investment"
               title="Investment required, by state"
               subtitle={
                 visiblePrimaryStates.length === 0
@@ -392,6 +414,7 @@ export default function StateSummaryPage() {
             </SectionCard>
 
             <SectionCard
+              id="waves"
               title="Rollout waves"
               subtitle={
                 scopeLabel === 'National'

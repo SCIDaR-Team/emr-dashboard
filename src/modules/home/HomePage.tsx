@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, ArrowRight } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
+import type { PageSection } from '@/components/layout/SectionTabs';
 import {
   LoadError,
   MaturityMeter,
@@ -32,6 +33,14 @@ import { SUB_THEMES, THEMES, THEME_BY_ID } from '@/lib/themes';
 import type { AreaProfile, Band, ThemeId } from '@/lib/types';
 
 const BAND_ORDER: Band[] = ['ready', 'moderately_ready', 'not_ready'];
+
+/** The tab strip under the header — this page's four bands, in reading order. */
+const SECTIONS: PageSection[] = [
+  { id: 'finding', label: 'The finding' },
+  { id: 'gap', label: 'Where the gap is' },
+  { id: 'where', label: 'Where & what it costs' },
+  { id: 'roadmap', label: 'Roadmap' },
+];
 
 /** Themes with sub-themes to show. Leadership has none — it is scored once per
  *  state — so it gets its own strip rather than a fifth, half-empty panel. */
@@ -116,11 +125,11 @@ export default function HomePage() {
 
   return (
     <>
-      <PageHeader title="Overview" subtitle="What the assessment found" />
+      <PageHeader title="Overview" subtitle="What the assessment found" sections={SECTIONS} />
 
       <div className="space-y-6 p-4 sm:p-5">
         {/* ── The finding ─────────────────────────────────────────── */}
-        <section>
+        <section id="finding" data-section>
           <p className="eyebrow">The finding</p>
           <h2 className="mt-1.5 max-w-[30ch] text-2xl font-semibold tracking-tight text-foreground">
             Ready in people, unready in power
@@ -156,7 +165,7 @@ export default function HomePage() {
         </TileRow>
 
         {/* ── Where the gap is ────────────────────────────────────── */}
-        <section>
+        <section id="gap" data-section>
           <p className="eyebrow">
             Where the gap is · {scoredSubThemes} sub-themes against the national mean of{' '}
             {score2(mean)}
@@ -184,7 +193,7 @@ export default function HomePage() {
           note. The slack lands between blocks that already read as separate,
           rather than as a gap under the last line of a card.
         */}
-        <section className="grid gap-4 xl:grid-cols-2">
+        <section id="where" data-section className="grid gap-4 xl:grid-cols-2">
           <SectionCard
             title="Where the not-ready facilities are"
             className="flex flex-col"
@@ -375,6 +384,7 @@ export default function HomePage() {
             beside each row moved with a state filter and implied a per-state
             schedule the assessment never supplied. */}
         <SectionCard
+          id="roadmap"
           title="Roadmap · 6-month plan"
           subtitle="what each readiness band does, month by month"
           action={

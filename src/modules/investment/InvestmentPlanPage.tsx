@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { AlertTriangle, ArrowLeft, Download, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/layout/PageHeader';
+import type { PageSection } from '@/components/layout/SectionTabs';
 import {
   LoadError,
   PageSkeleton,
@@ -108,6 +109,31 @@ export default function InvestmentPlanPage() {
     })).filter((g) => g.rows.length);
   }, [items]);
 
+  /**
+   * The tab strip under the header.
+   *
+   * Derived from `grouped` rather than declared, so it lists the domains that
+   * actually carry costed items and never offers a tab that scrolls to nothing.
+   * Leadership & Governance is the standing case — it scores 2.21 nationally
+   * and funds zero actions, which is the hole this page is about — but a state
+   * scope can empty a domain the same way.
+   *
+   * "By domain" leads, because a domain tab drops the reader into the middle of
+   * the schedule and the two summary cards above it are what that number came
+   * from. Labels are the themes' own short forms: five full domain names do not
+   * fit on one line at any width this app is read at.
+   */
+  const sections = useMemo<PageSection[]>(
+    () => [
+      { id: 'domains', label: 'By domain' },
+      ...grouped.map(({ theme }) => ({
+        id: `domain-${theme.id}`,
+        label: theme.shortLabel,
+      })),
+    ],
+    [grouped],
+  );
+
   if (national.isLoading) return <PageSkeleton />;
   if (national.error) {
     return (
@@ -139,6 +165,7 @@ export default function InvestmentPlanPage() {
     <>
       <PageHeader
         title="Investment Plan"
+        sections={sections}
         subtitle={
           scopeLabel
             ? `${scopeLabel} — itemised and costed`
@@ -252,7 +279,9 @@ export default function InvestmentPlanPage() {
             a caption or an empty-state prompt on the other — so their natural
             heights never match, and the cost card's "no rates yet" state is far
             shorter than the item bars beside it. */}
-        <div className="grid gap-4 xl:grid-cols-2">
+        {/* One section for the pair — they sit side by side from `xl`, and two
+            tabs pointing at the same scroll offset are one tab too many. */}
+        <div id="domains" data-section className="grid gap-4 xl:grid-cols-2">
           <SectionCard
             title="Items by domain"
             subtitle={`${formatCount(totals.quantity)} units across ${items.length} actions`}
@@ -459,6 +488,7 @@ export default function InvestmentPlanPage() {
                     <DomainRows
                       key={theme.id}
                       themeId={theme.id}
+                      anchorId={`domain-${theme.id}`}
                       rows={rows}
                       ctx={ctx}
                       subtotal={sub?.cost ?? 0}
@@ -513,6 +543,7 @@ export default function InvestmentPlanPage() {
 
 function DomainRows({
   themeId,
+  anchorId,
   rows,
   ctx,
   subtotal,
@@ -521,6 +552,8 @@ function DomainRows({
   onRate,
 }: {
   themeId: ThemeId;
+  /** Scroll target for the header's domain tabs. */
+  anchorId: string;
   rows: InvestmentItem[];
   ctx: RateContext;
   subtotal: number;
@@ -530,7 +563,10 @@ function DomainRows({
 }) {
   return (
     <>
-      <tr className="bg-surface-sunk">
+      {/* The group's banner row is the anchor: it carries the domain's name and
+          its totals, so landing on it puts the reader at the head of the block
+          rather than at its first action. */}
+      <tr id={anchorId} data-section className="bg-surface-sunk">
         <td colSpan={7} className="border-t border-input px-4 pb-1.5 pt-3 font-semibold">
           {THEME_BY_ID[themeId].label}{' '}
           <span className="mono text-[10.5px] font-normal text-muted-foreground">

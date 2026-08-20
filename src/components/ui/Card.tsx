@@ -23,6 +23,10 @@ export function Card({
 }
 
 interface SectionCardProps {
+  /** Scroll target for the header's section tabs. Setting it also marks the
+   *  panel with `data-section`, which is what carries the sticky-header
+   *  clearance — see the rule in globals.css. */
+  id?: string;
   title: string;
   subtitle?: string;
   action?: React.ReactNode;
@@ -40,6 +44,7 @@ interface SectionCardProps {
  * distinguish.
  */
 export function SectionCard({
+  id,
   title,
   subtitle,
   action,
@@ -48,7 +53,7 @@ export function SectionCard({
   children,
 }: SectionCardProps) {
   return (
-    <section className={cn('card', className)}>
+    <section id={id} data-section={id ? '' : undefined} className={cn('card', className)}>
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-border px-4 py-3">
         <h2 className="text-[13.5px] font-semibold text-foreground">{title}</h2>
         {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
