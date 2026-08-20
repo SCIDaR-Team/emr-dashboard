@@ -1,7 +1,7 @@
 import { BAND_CLASSES, BAND_LABEL, BANDS } from '@/lib/bands';
 import { cn } from '@/lib/cn';
 import { formatCount, percentOf } from '@/lib/format';
-import type { ExplorerCell } from '@/lib/types';
+import type { Band } from '@/lib/types';
 
 /**
  * How the facilities behind one cell split across the three bands.
@@ -20,19 +20,26 @@ import type { ExplorerCell } from '@/lib/types';
  * panel's small multiples — and there the bar was three colours and nothing
  * else. Red, amber and green in a 6px strip is the least separable form the
  * scale takes anywhere in the app.
+ *
+ * Takes a distribution and a denominator rather than an explorer cell: the
+ * Overview draws the same bar per domain from the facility population, which
+ * never passes through the cube.
  */
 export function DistributionBar({
-  cell,
+  distribution,
+  scored,
   size = 'md',
   showLegend = true,
   className,
 }: {
-  cell: ExplorerCell;
+  distribution: Record<Band, number>;
+  /** Facilities carrying a score here — the denominator, not `distribution`'s
+   *  sum, which excludes nothing but is not what the segments are cut on. */
+  scored: number;
   size?: 'sm' | 'md';
   showLegend?: boolean;
   className?: string;
 }) {
-  const { distribution, scored } = cell;
 
   if (!scored) {
     return (

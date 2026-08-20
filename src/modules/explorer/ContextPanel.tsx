@@ -1,13 +1,18 @@
 import { ExternalLink, Info, TriangleAlert } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { BandBadge, BandIcon, MaturityMeter, Skeleton } from '@/components/ui';
+import {
+  BandBadge,
+  BandIcon,
+  DistributionBar,
+  MaturityMeter,
+  Skeleton,
+} from '@/components/ui';
 import { useDataContext } from '@/state/dataContext';
 import { cn } from '@/lib/cn';
 import { BAND_ACTION, BAND_CLASSES, BAND_LABEL } from '@/lib/bands';
 import { AGGREGATION_LABEL, formatMetric, ordinal, pctReady } from '@/lib/explorerCube';
 import { formatCount, formatScore, percentOf, titleCaseName } from '@/lib/format';
 import { describeThemeNode, type ThemeNodeDescription } from '@/lib/themes';
-import { DistributionBar } from './DistributionBar';
 import type { ExplorerData } from '@/hooks/useExplorerData';
 import type { Aggregation, ExplorerCell, ThemeNodeId } from '@/lib/types';
 
@@ -144,7 +149,11 @@ export function ContextPanel({
               Distribution across {formatCount(cell.scored)}{' '}
               {node.level === 'indicator' ? 'respondents' : 'facilities'}
             </FigureLabel>
-            <DistributionBar cell={cell} className="mt-2" />
+            <DistributionBar
+              distribution={cell.distribution}
+              scored={cell.scored}
+              className="mt-2"
+            />
             {cell.band && (
               <p className="mt-3 text-xs text-muted-foreground">
                 Band implies:{' '}
@@ -248,7 +257,8 @@ export function ContextPanel({
                         )}
                       </p>
                       <DistributionBar
-                        cell={themeCell}
+                        distribution={themeCell.distribution}
+                        scored={themeCell.scored}
                         size="sm"
                         showLegend={false}
                         className="mt-2"

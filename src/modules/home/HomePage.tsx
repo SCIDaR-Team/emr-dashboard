@@ -4,6 +4,8 @@ import { AlertTriangle, ArrowRight } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import type { PageSection } from '@/components/layout/SectionTabs';
 import {
+  BandBadge,
+  DistributionBar,
   LoadError,
   MaturityMeter,
   PageSkeleton,
@@ -19,7 +21,7 @@ import { NigeriaChoropleth } from '@/components/map';
 import { RoadmapMatrix } from '@/components/scorecard';
 import { useDataContext } from '@/state/dataContext';
 import { BAND_ACTION, BAND_LABEL, toBand } from '@/lib/bands';
-import { formatCount, formatNaira, formatScore } from '@/lib/format';
+import { formatCount, formatNaira, formatScore, percentOf } from '@/lib/format';
 import { buildShareMap } from '@/lib/scale';
 import {
   lineTotal,
@@ -30,7 +32,7 @@ import { useInvestmentRateStore } from '@/store/investmentRateStore';
 
 const score2 = (v: number | null | undefined) => formatScore(v, 2);
 import { SUB_THEMES, THEMES, THEME_BY_ID } from '@/lib/themes';
-import type { AreaProfile, Band, ThemeId } from '@/lib/types';
+import type { AreaProfile, Band, FacilityThemeId, ThemeId } from '@/lib/types';
 
 const BAND_ORDER: Band[] = ['ready', 'moderately_ready', 'not_ready'];
 
@@ -45,6 +47,13 @@ const SECTIONS: PageSection[] = [
 /** Themes with sub-themes to show. Leadership has none — it is scored once per
  *  state — so it gets its own strip rather than a fifth, half-empty panel. */
 const PANEL_THEMES = THEMES.filter((t) => t.facilityLevel);
+
+/** Stand-in while the facility population is still in flight. */
+const EMPTY_SPREAD: Record<Band, number> = {
+  ready: 0,
+  moderately_ready: 0,
+  not_ready: 0,
+};
 
 /**
  * Module 1 — Overview.
@@ -62,7 +71,7 @@ const PANEL_THEMES = THEMES.filter((t) => t.facilityLevel);
  * willingness. It is power and connectivity.
  */
 export default function HomePage() {
-  const { national, states, lgas } = useDataContext();
+  const { national, states, lgas, facilities } = useDataContext();
   const profile = national.data;
 
   // Unit rates come from the shared store, so a rate typed on the Investment
@@ -87,6 +96,46 @@ export default function HomePage() {
         .map((s) => s.name),
     [primaryStates],
   );
+
+  /**
+   * How the facilities split across the three bands *on each domain*.
+   *
+   * Not derivable from `AreaProfile`: `archetypeDistribution` is the overall
+   * split, and `themeScores` is one mean per domain. A mean of 2.85 can be
+   * every facility at 2.85 or half at 1 and half at 4.7, and those need
+   * different money — which is the whole reason the bar is on this page.
+   *
+   * Banded the same way the explorer cube bands its theme nodes, so a reader
+   * moving between the two pages sees the same figures.
+   *
+   * Note what "6% ready on Tech. Infrastructure" means, because it is *not*
+   * the 4% in the tiles above: the overall archetype takes the minimum across
+   * the core gates, so a facility is Ready only if it clears every one, while
+   * this counts it ready on this domain alone. Both are honest; they answer
+   * different questions, and the caption says which.
+   */
+  const themeDistributions = useMemo(() => {
+    const empty = (): Record<Band, number> => ({
+      ready: 0,
+      moderately_ready: 0,
+      not_ready: 0,
+    });
+    const out: Record<string, { distribution: Record<Band, number>; scored: number }> =
+      Object.fromEntries(
+        PANEL_THEMES.map((t) => [t.id, { distribution: empty(), scored: 0 }]),
+      );
+
+    for (const facility of facilities.data) {
+      for (const theme of PANEL_THEMES) {
+        const band = toBand(facility.themeScores[theme.id as FacilityThemeId]);
+        if (!band) continue;
+        const entry = out[theme.id]!;
+        entry.distribution[band] += 1;
+        entry.scored += 1;
+      }
+    }
+    return out;
+  }, [facilities.data]);
 
   const extremes = useMemo(() => rankSubThemes(profile), [profile]);
 
@@ -122,6 +171,7 @@ export default function HomePage() {
 
   const total = profile.facilityCount;
   const mean = profile.averageScore;
+  const compositeBand = toBand(profile.compositeReadiness);
 
   return (
     <>
@@ -142,7 +192,15 @@ export default function HomePage() {
           </p>
         </section>
 
-        <TileRow className="sm:grid-cols-2 xl:grid-cols-4">
+        <TileRow className="sm:grid-cols-2 xl:grid-cols-6">
+          {/* The denominator comes first: every figure to its right is a share
+              of it, and a reader who meets "1,448 not ready" before knowing
+              what it is out of has to hold the number and go looking. */}
+          <Tile
+            label="Facilities assessed"
+            value={formatCount(total)}
+            note={`across ${formatCount(primaryStates.length)} states`}
+          />
           {BAND_ORDER.map((band) => {
             const n = profile.archetypeDistribution[band] ?? 0;
             return (
@@ -156,11 +214,51 @@ export default function HomePage() {
               />
             );
           })}
+          {/*
+            Composite readiness, not the mean domain score.
+
+            The mean treats a facility that clears every gate and one blocked on
+            power as interchangeable if their averages match. The composite —
+            (5·ready + 3·moderate + 1·not ready) / total — is cut on the band
+            each facility actually lands in, which is what the roll-out is
+            planned against. It reads lower than the old figure (2.05 against
+            3.53) because it is measuring a different thing, not because
+            anything got worse.
+
+            The band and the maturity meter sit inside this tile rather than
+            beside it: both are the same number said again, in the words the
+            rest of the app uses for it — which is why the badge bands the
+            composite rather than reading `profile.band`. That field is
+            `toBand(averageScore)` (etl/lib/rollup.mjs), so beside 2.05 it would
+            print "Moderately ready" — the band of a number that is no longer on
+            the tile. Banding what is shown also matches the explorer, whose
+            national node reads Not ready.
+          */}
           <Tile
-            label="National average"
-            value={score2(mean)}
+            label="Composite readiness"
+            value={score2(profile.compositeReadiness)}
             suffix="/5"
-            note={mean != null ? BAND_LABEL[toBand(mean)!] : '—'}
+            aside={compositeBand ? <BandBadge band={compositeBand} size="sm" /> : undefined}
+          />
+
+          {/* Its own tile, not a second line under the composite: the maturity
+              level is a different scale from the readiness band — five steps
+              toward Optimized rather than three states of readiness — and
+              stacking them made one tile read as though the badge and the
+              blocks were two halves of a single verdict. */}
+          <Tile
+            label="Maturity band"
+            value={
+              <MaturityMeter
+                score={profile.compositeReadiness}
+                size="xl"
+                // The meter is nowrap by default, which is right beside a table
+                // figure and wrong as a tile's whole content: the long labels
+                // ("Institutionalized") would run past the tile edge rather
+                // than dropping under the blocks.
+                className="flex-wrap whitespace-normal"
+              />
+            }
           />
         </TileRow>
 
@@ -172,7 +270,13 @@ export default function HomePage() {
           </p>
           <div className="mt-2 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {PANEL_THEMES.map((theme) => (
-              <DomainPanel key={theme.id} themeId={theme.id} profile={profile} mean={mean} />
+              <DomainPanel
+                key={theme.id}
+                themeId={theme.id}
+                profile={profile}
+                mean={mean}
+                spread={themeDistributions[theme.id]}
+              />
             ))}
           </div>
           <LeadershipStrip profile={profile} mean={mean} floorStates={leadershipFloor} />
@@ -419,10 +523,15 @@ function DomainPanel({
   themeId,
   profile,
   mean,
+  spread,
 }: {
   themeId: ThemeId;
   profile: AreaProfile;
   mean: number | null;
+  /** How this domain's facilities split across the bands. Absent until the
+   *  facility population has loaded — the bar holds its empty track meanwhile,
+   *  so the panel does not change height under the reader. */
+  spread?: { distribution: Record<Band, number>; scored: number };
 }) {
   const score = profile.themeScores[themeId];
   const subs = SUB_THEMES.filter((s) => s.themeId === themeId)
@@ -450,6 +559,25 @@ function DomainPanel({
             is a second reading of the same number, not a second number. */}
         <div className="mt-1.5 basis-full">
           <MaturityMeter score={score} />
+        </div>
+
+        {/* And under the meter, the spread the score was averaged out of —
+            "on this domain" said explicitly, because it is a different
+            population from the Ready count in the tiles above, which requires
+            a facility to clear every gate rather than this one. */}
+        <div className="mt-2 basis-full">
+          <DistributionBar
+            distribution={spread?.distribution ?? EMPTY_SPREAD}
+            scored={spread?.scored ?? 0}
+            size="sm"
+            showLegend={false}
+          />
+          {spread && spread.scored > 0 && (
+            <p className="mt-1.5 text-[11px] text-muted-foreground">
+              {percentOf(spread.distribution.ready, spread.scored)} ready on this
+              domain
+            </p>
+          )}
         </div>
       </header>
       <div className="flex flex-1 flex-col p-4">
