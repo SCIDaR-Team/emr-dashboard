@@ -116,8 +116,13 @@ state-level only.
 | `national.json` | National roll-up |
 | `indicators.json` | 133 indicator definitions — class, source and score columns, buckets, why an indicator is unscored, and `answeredCount`: how many of the 2,804 facilities carry a score for it |
 | `requirements.json` | The 24 minimum-requirement definitions; facilities carry only `{id, met, measured}` |
-| `labels.json` | Generated from the XLSForm |
 | `explorer-cube.json` | `[geoId][themeNodeId]` → `{score, band, n, scored, distribution}`. `distribution` is banded on the *selected node*, not the facility archetype — the two coincide only for `overall`. `scored` is how many of the `n` carry a value for that node, and is what the distribution counts sum to |
-| `explorer-nodes.json` | The thematic axis' **cube** nodes: `overall`, 4 themes, 10 sub-themes |
 | `indicator-scores.json` | The axis' fourth level, deliberately outside the cube: `{ids, answered, byFacility}` — 50 scored indicators × 2,804 facilities, values aligned to `ids`. Fetched by the browser only when an indicator is selected (541 KB raw, ~99 KB gzipped). **Values are unrounded on purpose:** `11/3` is exactly `BAND_UPPER_CUT` and reachable, so rounding at any precision flips a facility from Moderately ready to Ready |
 | `snapshot.json` | Build provenance and validation result |
+
+Two files the ETL used to emit are no longer built. `labels.json` (XLSForm field
+labels) had no runtime consumer at all — display names are resolved from the
+`choices` sheet at build time and baked into every record, so the browser never
+needed a label map. `explorer-nodes.json` (the cube's thematic axis) was read
+only by `src/lib/explorerCube.test.ts`, which now takes the axis from the cube's
+own national cell instead.

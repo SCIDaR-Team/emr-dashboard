@@ -6,8 +6,11 @@
  * zone -> state -> LGA cascade. Generating labels from here beats hand-
  * maintaining slug maps, and beats title-casing slugs, which is only a guess.
  *
- * This also resolves the LGA-count question: the ODK export has 304 distinct
- * LGA values, the Figma home screen says 205. The choices sheet is the arbiter.
+ * The LGA-count question this used to pose is settled, and not by this sheet:
+ * the scored export, the client's own planned-sample list and OCHA/GRID3's
+ * ADM2 boundaries all put 305 LGAs in the 12 primary states, matching state by
+ * state. The Figma's "205" is a transcription error. See the note on COVERAGE
+ * in src/lib/constants.ts.
  */
 
 import { readFile } from 'node:fs/promises';

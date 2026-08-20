@@ -40,10 +40,20 @@ const read = <T>(name: string): T =>
   JSON.parse(readFileSync(path.join(DATA, name), 'utf8')) as T;
 
 const cube = read<ExplorerCube>('explorer-cube.json');
-const nodes = read<ThemeNodeId[]>('explorer-nodes.json');
 const facilities = read<FacilitySummary[]>('facilities-summary.json');
 const matrix = read<IndicatorMatrix>('indicator-scores.json');
 const indicatorDefs = read<IndicatorDef[]>('indicators.json');
+
+/**
+ * The thematic axis, read off the cube's own national cell.
+ *
+ * It used to come from `explorer-nodes.json`, a sidecar the ETL emitted and
+ * nothing ever fetched — the axis the app renders is declared in
+ * src/lib/themes.ts — so that file is no longer built. Taking the axis from the
+ * artifact under test is the stronger choice anyway: a node missing from the
+ * cube can no longer slip through by being absent from both sides at once.
+ */
+const nodes = Object.keys(cube.national ?? {}) as ThemeNodeId[];
 
 const byState = (stateId: string) => facilities.filter((f) => f.stateId === stateId);
 const lgaKey = (f: FacilitySummary) => `${f.stateId}.${f.lgaId}`;

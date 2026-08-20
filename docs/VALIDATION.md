@@ -47,7 +47,7 @@ Four different facility counts are in circulation:
 
 | Count | Source |
 |---|---|
-| 2,808 | Sample design |
+| 2,808 | Sample design — confirmed: `List of facilities for assessme` holds exactly 2,808 rows |
 | 2,825 | Raw ODK export |
 | **2,804** | Scored rows in `ERA dataset_v4.xlsx` — what we use |
 | 2,696 | Denominator behind several figures in the report |
@@ -58,6 +58,42 @@ and labelled rather than dropped — hiding them would conceal the problem.
 
 **This needs resolving with the assessment team.** Stakeholders will compare
 dashboard and report side by side on day one.
+
+### 2,808 vs 2,804 — settled
+
+The top two rows of that table are now fully reconciled, which leaves 2,825 and
+2,696 as the open ones.
+
+Every one of the 2,804 scored UUIDs appears in the 2,808-row planned sample, and
+nothing was scored that was not planned. The gap is four Kano facilities that
+were listed for assessment but carry no scored row:
+
+| LGA | Facility | UUID |
+|---|---|---|
+| Gaya | Gamoji Health Post | `470e2822-bb89-4e80-9419-1ceaabef8563` |
+| Sumaila | Rumo Health Post | `6d8ee01f-c3f7-4d44-8a39-12672949d778` |
+| Sumaila | Dagora Health Post | `d3839d1b-0bec-4466-9037-804f73c81276` |
+| Doguwa | Ririwai Basic Health Clinic | `fbe25d5a-02b5-4c99-a226-5c9e8979f963` |
+
+So 2,808 and 2,804 are both correct and mean different things — planned versus
+achieved. Copy stating what was *assessed* must use 2,804 (`COVERAGE.facilitiesScored`).
+Worth asking the assessment team whether those four were non-response,
+inaccessible, or dropped from the frame; the workbook does not say.
+
+### 305 vs 205 LGAs — settled
+
+305 is correct. The scored export, the client's own planned-sample sheet and
+OCHA/GRID3's ADM2 boundaries all report 305 LGAs across the 12 primary states,
+and agree state by state (Kano 44, Oyo 33, Akwa Ibom 31, Imo 27, Jigawa 27,
+Niger 25, Rivers 23, Adamawa 21, Anambra 21, Bauchi 20, Lagos 20, Nasarawa 13)
+once names are normalised for case and punctuation.
+
+That match is the substantive finding: GRID3 says these 12 states *contain* 305
+LGAs, so the assessment achieved complete LGA coverage rather than producing an
+inflated export, which is how the discrepancy had been read. No source anywhere
+yields 205; it is treated as a transcription error in the deck and corrected in
+`COVERAGE.lgas`. The published deck and any report quoting 205 still need
+updating — that part is NPHCDA's to action.
 
 ## Definitional variances
 

@@ -71,7 +71,12 @@ async function main() {
   const dataset = await readEraDatasetV2(source);
   console.log(`  ${dataset.rows.length} scored facilities, ${dataset.columns.length} merged columns`);
 
-  console.log('▸ Reading XLSForm survey + choices (for labels)');
+  // Only `choices` is load-bearing: it resolves state, LGA and facility slugs to
+  // their real names, applied to each facility record in buildFacilities(). The
+  // `survey` sheet's field labels used to be emitted as `labels.json` and were
+  // never fetched by anything, so that output is gone — the reader still parses
+  // them, cheaply, since it has the workbook open either way.
+  console.log('▸ Reading XLSForm survey + choices (for display names)');
   let form = { labels: {}, choiceLists: {}, lgasByState: new Map() };
   if (existsSync(labelsSource)) {
     form = await readXlsForm(labelsSource);
@@ -173,9 +178,7 @@ async function main() {
   await write('national.json', national);
   await write('indicators.json', indicatorDefs);
   await write('requirements.json', REQUIREMENTS);
-  await write('labels.json', form.labels);
   await write('explorer-cube.json', cube);
-  await write('explorer-nodes.json', nodes);
   await write('indicator-scores.json', indicatorMatrix);
   await write('snapshot.json', {
     builtAt: new Date().toISOString(),
