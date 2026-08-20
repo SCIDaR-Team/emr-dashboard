@@ -100,6 +100,8 @@ interface MaturityBadgeProps {
   score: number | null;
   size?: 'sm' | 'md';
   className?: string;
+  /** Passed through to the meter's label — see `MaturityMeter`. */
+  labelClassName?: string;
 }
 
 /**
@@ -131,9 +133,19 @@ interface MaturityBadgeProps {
  * different and taught neither scale — and now that those tokens resolve to
  * the blue ramp, a tinted label would also be pale-on-pale.
  */
-export function MaturityBadge({ score, size = 'md', className }: MaturityBadgeProps) {
+export function MaturityBadge({
+  score,
+  size = 'md',
+  className,
+  labelClassName,
+}: MaturityBadgeProps) {
   return (
-    <MaturityMeter score={score} size={size === 'sm' ? 'sm' : 'lg'} className={className} />
+    <MaturityMeter
+      score={score}
+      size={size === 'sm' ? 'sm' : 'lg'}
+      className={className}
+      labelClassName={labelClassName}
+    />
   );
 }
 
