@@ -239,7 +239,12 @@ export default function HomePage() {
             }
           >
             <p className="eyebrow mb-2">Items by domain</p>
-            <div className="space-y-2.5">
+            {/* The two bar groups grow, and spread their five rows over whatever
+                height the map column gives this card, rather than sitting in a
+                fixed stack with the slack pooled above the footnote. Both groups
+                hold five rows and take an equal share of the free space, so a row
+                in one group is spaced like a row in the other. */}
+            <div className="flex flex-1 flex-col justify-between gap-3">
               {THEMES.map((theme) => {
                 const q = investment.byTheme[theme.id] ?? 0;
                 return (
@@ -252,7 +257,7 @@ export default function HomePage() {
                         {q ? formatCount(q) : 'none'}
                       </span>
                     </div>
-                    <div className="h-[7px] rounded-[1px] bg-surface-sunk">
+                    <div className="h-[11px] rounded-[1px] bg-surface-sunk">
                       <span
                         className={`block h-full rounded-r-[3px] ${q ? 'bg-score-3' : 'bg-nodata'}`}
                         style={{ width: `${q ? (q / investment.max) * 100 : 0}%` }}
@@ -263,7 +268,7 @@ export default function HomePage() {
               })}
             </div>
 
-            <div className="mt-5 border-t border-border pt-4">
+            <div className="mt-5 flex flex-1 flex-col border-t border-border pt-4">
               <div className="mb-2 flex items-baseline justify-between gap-3">
                 <p className="eyebrow">Cost by domain</p>
                 {/* "Scaled separately" is doing real work in two words: these
@@ -295,7 +300,7 @@ export default function HomePage() {
                   </p>
                 </div>
               ) : (
-                <>
+                <div className="flex flex-1 flex-col">
                   {costIsIllustrative && (
                     <div
                       role="note"
@@ -316,7 +321,7 @@ export default function HomePage() {
                     </div>
                   )}
 
-                  <div className="space-y-2.5">
+                  <div className="flex flex-1 flex-col justify-between gap-3">
                     {THEMES.map((theme) => {
                       const cost = investment.costByTheme[theme.id] ?? 0;
                       return (
@@ -333,7 +338,7 @@ export default function HomePage() {
                               {cost ? formatNaira(cost, true) : 'none'}
                             </span>
                           </div>
-                          <div className="h-[7px] rounded-[1px] bg-surface-sunk">
+                          <div className="h-[11px] rounded-[1px] bg-surface-sunk">
                             <span
                               className={`block h-full rounded-r-[3px] ${cost ? 'bg-score-3' : 'bg-nodata'}`}
                               style={{
@@ -345,11 +350,11 @@ export default function HomePage() {
                       );
                     })}
                   </div>
-                </>
+                </div>
               )}
             </div>
 
-            <div className="mt-auto border-l-2 border-brand-500 pl-4 pt-5">
+            <div className="mt-6 border-l-2 border-brand-500 pl-4">
               <p className="mono mb-1 text-[10px] uppercase tracking-[0.12em] text-brand-500">
                 The hole in the plan
               </p>

@@ -110,7 +110,7 @@ export default function LandingPage() {
               ER
             </span>
             <span className="mono text-[11px] uppercase tracking-[0.1em] text-foreground">
-              NPHCDA <span className="text-muted-foreground">· EMR readiness</span>
+              EMR readiness
             </span>
           </div>
           <Link

@@ -59,13 +59,8 @@ function BrandBlock({
       {collapsed ? (
         <span className="sr-only">EMR Readiness Assessment</span>
       ) : (
-        <span className="min-w-0">
-          <span className="block truncate text-[12.5px] font-semibold leading-tight text-foreground">
-            EMR Readiness
-          </span>
-          <span className="mono block text-[9.5px] uppercase tracking-[0.1em] text-muted-foreground">
-            NPHCDA
-          </span>
+        <span className="min-w-0 truncate text-[12.5px] font-semibold leading-tight text-foreground">
+          EMR Readiness
         </span>
       )}
     </Link>
@@ -226,7 +221,7 @@ export function MobileNavBar() {
             {current?.label ?? 'EMR Readiness Assessment'}
           </p>
           <p className="mono truncate text-[9.5px] uppercase tracking-[0.1em] leading-tight text-muted-foreground">
-            NPHCDA · EMR readiness
+            EMR readiness
           </p>
         </div>
       </div>
