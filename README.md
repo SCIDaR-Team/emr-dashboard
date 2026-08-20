@@ -165,7 +165,8 @@ src/
   lib/          Types, constants, bands, archetype, themes, formatting
   state/        DataProvider and its context
   store/        Zustand — filters, theme, toasts
-docs/           PHASES (tracker) · SCORING · DATA_DICTIONARY · VALIDATION
+docs/           PHASES (tracker) · SCORING · SCORE_PROVENANCE · DATA_DICTIONARY
+                VALIDATION · DEPLOYMENT · HOW_THE_SCORES_WORK (plain-language)
 ```
 
 `etl/sources/indicatorBindings.mjs` is the join between the rubric's prose

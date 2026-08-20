@@ -5,11 +5,11 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import type { PageSection } from '@/components/layout/SectionTabs';
 import {
   BandBadge,
+  BandLegend,
   DistributionBar,
   LoadError,
   MaturityMeter,
   PageSkeleton,
-  ScaleLegend,
   ScoreAxis,
   ScoreRow,
   ScoreTrack,
@@ -22,7 +22,7 @@ import { RoadmapMatrix } from '@/components/scorecard';
 import { useDataContext } from '@/state/dataContext';
 import { BAND_ACTION, BAND_LABEL, toBand } from '@/lib/bands';
 import { formatCount, formatNaira, formatScore, percentOf } from '@/lib/format';
-import { buildShareMap } from '@/lib/scale';
+import { buildBandMap } from '@/lib/scale';
 import {
   lineTotal,
   usesIllustrative,
@@ -155,7 +155,7 @@ export default function HomePage() {
 
   /** Share of each state's facilities in the Not-ready band, fitted to the
    *  observed range — see the note on GeoDatum.step. */
-  const mapData = useMemo(() => buildShareMap(states.data), [states.data]);
+  const mapData = useMemo(() => buildBandMap(states.data), [states.data]);
 
   if (national.isLoading || states.isLoading) return <PageSkeleton />;
   if (national.error) {
@@ -299,7 +299,7 @@ export default function HomePage() {
         */}
         <section id="where" data-section className="grid gap-4 xl:grid-cols-2">
           <SectionCard
-            title="Where the not-ready facilities are"
+            title="How ready each state is"
             className="flex flex-col"
             bodyClassName="flex flex-1 flex-col"
             action={
@@ -311,15 +311,17 @@ export default function HomePage() {
               </Link>
             }
           >
-            <NigeriaChoropleth data={mapData.data} />
+            <NigeriaChoropleth data={mapData} />
             <div className="mt-auto pt-3">
-              <ScaleLegend
-                lo={mapData.lo}
-                hi={mapData.hi}
-                format={(v) => `${Math.round(v)}%`}
-                caption="Share of facilities not ready"
-                note="Hover a state to name it. The 25 desk-review states carry no facility-level findings and are counted in no average."
-              />
+              <BandLegend includeNoData noDataLabel="Desk review — no band" />
+              <p className="mono mt-2 text-[10px] leading-relaxed tracking-wide text-muted-foreground">
+                Each state is filled by its own readiness band. All 12 assessed
+                states classify as moderately ready, so the assessed map reads as
+                one colour — that uniformity is the finding. Hover a state for its
+                average score. The 45° hatch is evidence grade: those 25 states
+                were desk-reviewed, carry no facility-level findings, and are
+                counted in no average.
+              </p>
             </div>
           </SectionCard>
 

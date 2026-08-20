@@ -8,6 +8,7 @@
 
 import { stepFor } from '@/components/map/mapTypes';
 import type { GeoDatum } from '@/components/map/mapTypes';
+import { BAND_LABEL } from './bands';
 import { formatCount } from './format';
 import type { AreaProfile } from './types';
 
@@ -32,6 +33,41 @@ export function scorePct(v: number, lo = SCORE_MIN, hi = SCORE_MAX): number {
  * twelve fall in one step, which throws that away again; the legend prints the
  * fitted bounds so nothing is hidden.
  */
+/**
+ * State readiness band per state, as a categorical choropleth keyed by state id.
+ *
+ * The counterpart to `buildShareMap` below, and deliberately not the default:
+ * it ships **no** `step`, so each polygon fills from its own readiness band
+ * rather than from the sequential ramp.
+ *
+ * Every one of the 12 assessed states currently classifies to the same
+ * state-level band, so this paints twelve polygons in one colour. That is the
+ * encoding doing its job, not failing at it — the map says "the assessed
+ * country is uniformly moderately ready", which is the actual finding, where
+ * the ramp says how the not-ready facilities are distributed inside it. Pick
+ * the one that matches the sentence the card is making.
+ *
+ * Pair with `BandLegend`, never `ScaleLegend`: there is no domain to print.
+ */
+export function buildBandMap(states: AreaProfile[]): Record<string, GeoDatum> {
+  const data: Record<string, GeoDatum> = {};
+  for (const s of states) {
+    data[s.id] = {
+      band: s.band,
+      n: s.facilityCount,
+      evidenceGrade: s.evidenceGrade,
+      label: s.name,
+      valueLabel:
+        s.band && s.averageScore != null
+          ? `${BAND_LABEL[s.band]} — ${s.averageScore.toFixed(2)} average across ${formatCount(
+              s.facilityCount,
+            )} facilities`
+          : undefined,
+    };
+  }
+  return data;
+}
+
 export function buildShareMap(states: AreaProfile[]) {
   const shares = new Map<string, number>();
   for (const s of states) {
