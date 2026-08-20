@@ -2,10 +2,12 @@
  * Display formatting.
  *
  * Note on names: the assessment data arrives as ODK slugs (`akwa_ibom`,
- * `ndito_eka_iba_health_centre`). Prefer the authoritative label from the
- * XLSForm `choices` sheet — generated into labels.json — and fall back to
- * `titleCaseName()` only where no label exists. Title-casing is a heuristic
- * and will mangle names the choice list would have got right.
+ * `ndito_eka_iba_health_centre`). The authoritative label comes from the
+ * XLSForm `choices` sheet and is resolved at build time — every name in
+ * public/data is already the real one — with `titleCaseName()` as the fallback
+ * where the choice list has no entry. Title-casing is a heuristic and will
+ * mangle names the choice list would have got right, so it is a last resort,
+ * not the default path.
  */
 
 import { CURRENCY } from './constants';

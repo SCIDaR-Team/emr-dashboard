@@ -9,6 +9,7 @@
 
 import { bandDistribution, compositeReadiness, meanOrNull, toBand } from './scoring.mjs';
 import { rollUpInvestments } from './investment.mjs';
+import { zoneOf } from './zones.mjs';
 
 const ALL_STATES = [
   'Abia', 'Adamawa', 'Akwa Ibom', 'Anambra', 'Bauchi', 'Bayelsa', 'Benue',
@@ -130,6 +131,10 @@ export function rollUp(facilities, leadershipByState = new Map()) {
       leadershipScore: leadershipByState.get(stateName)?.score ?? null,
     });
     profile.lgaCount = new Set(stateFacilities.map((f) => f.lgaId)).size;
+    // Taken from the facility rows where they have it — the dataset is the
+    // authority for the states it actually visited; zones.mjs only fills the
+    // 25 it did not.
+    profile.zone = stateFacilities[0].zone ?? zoneOf(stateName);
     states.push(profile);
   }
 
@@ -143,6 +148,7 @@ export function rollUp(facilities, leadershipByState = new Map()) {
       level: 'state',
       name,
       parentId: null,
+      zone: zoneOf(name),
       evidenceGrade: 'secondary',
       facilityCount: 0,
       archetypeDistribution: { not_ready: 0, moderately_ready: 0, ready: 0 },

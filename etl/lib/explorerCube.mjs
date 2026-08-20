@@ -2,7 +2,7 @@
  * Precompute the Drill-Down Explorer cube.
  *
  * The other modules read one entity at a time. The explorer needs
- * (geography × thematic node) on demand — 37 states + ~205 LGAs + 2,804
+ * (geography × thematic node) on demand — 37 states + 305 LGAs + 2,804
  * facilities across 15 thematic nodes. Precomputing turns every interaction
  * into a lookup instead of a scan over the facility list.
  *

@@ -159,12 +159,31 @@ export function ScoreRow({
   );
 }
 
-/** The 1 / mean / 5 rule under a stack of ScoreRows. */
-export function ScoreAxis({ reference }: { reference?: number | null }) {
+/**
+ * The 1 / mean / 5 rule under a stack of ScoreRows.
+ *
+ * `referenceLabel` names what the tick actually is. It defaults to the national
+ * mean because that is what every original caller passes, but sub-theme rows
+ * are read against their own domain's mean instead — and a rule labelled
+ * "national mean" while marking something else is worse than no rule at all.
+ */
+export function ScoreAxis({
+  reference,
+  referenceLabel = 'national mean',
+}: {
+  reference?: number | null;
+  referenceLabel?: string;
+}) {
   return (
     <div className="mono mt-2.5 flex justify-between border-t border-border pt-2 text-[9.5px] tracking-wider text-muted-foreground">
       <span>1</span>
-      {reference != null ? <span>national mean {formatScore(reference)} │</span> : <span>3</span>}
+      {reference != null ? (
+        <span>
+          {referenceLabel} {formatScore(reference, 2)} │
+        </span>
+      ) : (
+        <span>3</span>
+      )}
       <span>5</span>
     </div>
   );
@@ -283,7 +302,9 @@ export function MaturityMeter({
   labelClassName,
 }: {
   score: number | null;
-  size?: 'sm' | 'lg';
+  /** `xl` is the tile size: the meter is the tile's whole content there, so it
+   *  is set to read as a figure rather than as an annotation beside one. */
+  size?: 'sm' | 'lg' | 'xl';
   className?: string;
   /** Class for the text label. Give it a width where several meters stack and
    *  the ragged label lengths would otherwise shunt the step blocks sideways. */
@@ -309,7 +330,11 @@ export function MaturityMeter({
             key={b.level}
             className={cn(
               'block rounded-[1px]',
-              size === 'lg' ? 'h-[13px] w-2' : 'h-2.5 w-1.5',
+              size === 'xl'
+                ? 'h-[19px] w-2.5'
+                : size === 'lg'
+                  ? 'h-[13px] w-2'
+                  : 'h-2.5 w-1.5',
               level && i <= index ? MATURITY_STEP[level] : 'bg-surface-sunk',
             )}
           />
@@ -317,8 +342,11 @@ export function MaturityMeter({
       </span>
       <span
         className={cn(
-          'mono uppercase tracking-[0.09em] text-muted-foreground',
-          size === 'lg' ? 'text-[10.5px]' : 'text-[9.5px]',
+          'mono uppercase tracking-[0.09em]',
+          size === 'xl'
+            ? 'text-[15px] font-semibold tracking-[0.06em] text-foreground'
+            : 'text-muted-foreground',
+          size === 'lg' ? 'text-[10.5px]' : size === 'sm' ? 'text-[9.5px]' : '',
           labelClassName,
         )}
       >
@@ -354,6 +382,7 @@ export function Tile({
   suffix,
   note,
   band,
+  aside,
   className,
 }: {
   label: string;
@@ -361,6 +390,13 @@ export function Tile({
   suffix?: string;
   note?: React.ReactNode;
   band?: Band;
+  /**
+   * A second reading of the same figure, on the figure's own line after the
+   * suffix — a readiness badge beside a score. Outside the mono block rather
+   * than inside it, so a pill does not inherit the tabular face the number is
+   * set in. For a second *number*, add a tile.
+   */
+  aside?: React.ReactNode;
   className?: string;
 }) {
   return (
@@ -369,13 +405,16 @@ export function Tile({
         {band && <BandMark band={band} className="h-2 w-3.5" />}
         <span className="truncate">{label}</span>
       </div>
-      <div className="mono text-[25px] font-semibold leading-none tracking-tight text-foreground">
-        {value}
-        {suffix && (
-          <span className="ml-1.5 text-xs font-medium tracking-normal text-muted-foreground">
-            {suffix}
-          </span>
-        )}
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1.5">
+        <span className="mono text-[25px] font-semibold leading-none tracking-tight text-foreground">
+          {value}
+          {suffix && (
+            <span className="ml-1.5 text-xs font-medium tracking-normal text-muted-foreground">
+              {suffix}
+            </span>
+          )}
+        </span>
+        {aside}
       </div>
       {note && <div className="mt-1.5 text-xs text-muted-foreground">{note}</div>}
     </div>

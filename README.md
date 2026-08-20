@@ -5,7 +5,7 @@ healthcare facilities' readiness for Electronic Medical Record (EMR)
 implementation, for **NPHCDA**, in partnership with NTBLCP, The Global Fund and
 Solina.
 
-Readiness findings across **36 states + FCT**, **205 LGAs** and **2,808
+Readiness findings across **36 states + FCT**, **305 LGAs** and **2,804
 healthcare facilities** — 12 states assessed by primary facility survey, the
 remaining 25 plus the FCT by secondary desk review.
 
@@ -145,7 +145,7 @@ assessment report will be read side by side, so drift fails the build under
 | **State-level assessment output not supplied** | `/states` cannot render. No source for Leadership & Governance scores, Overall State Readiness, or any finding for the 25 secondary states. |
 | **Unit costs absent from every supplied file** | All investment and roadmap figures. Quantities are largely derivable (`minimum_required_devices`, `computing_devices_available`, `number_service_points`); prices are not — a full-text sweep of the workbook, the 89-slide deck and the ODK export found none. Prototype figures are placeholders. |
 | **LGA boundary polygons** | The State and Explorer choropleths. Source GRID3 ADM2 and convert with the shapefile script. |
-| **LGA count conflict** | 305 distinct values in the ODK export vs 205 on the prototype. The XLSForm `choices` sheet is the arbiter. |
+| **~~LGA count conflict~~ — resolved** | 305 is correct. The scored export, the client's planned-sample sheet and OCHA/GRID3 ADM2 all put 305 LGAs in the 12 primary states, agreeing state by state; the prototype's 205 matches no source. Deck and downstream reports still need correcting — see the note on `COVERAGE` in `src/lib/constants.ts`. |
 | **Two minimum requirements are unmeasurable** | The instrument asks whether *any* staff were trained, never how many, and never asks about a unique patient identifier. Both return `null` — rendered "not assessed", never `false`. The other 22 are wired. |
 | **33 rubric questions were never scored** | Response buckets were written for them and the published workbook scored none — every referral question, most device-condition detail. Carried as contextual. Worth confirming with the assessment team. |
 
@@ -165,7 +165,8 @@ src/
   lib/          Types, constants, bands, archetype, themes, formatting
   state/        DataProvider and its context
   store/        Zustand — filters, theme, toasts
-docs/           PHASES (tracker) · SCORING · DATA_DICTIONARY · VALIDATION
+docs/           PHASES (tracker) · SCORING · SCORE_PROVENANCE · DATA_DICTIONARY
+                VALIDATION · DEPLOYMENT · HOW_THE_SCORES_WORK (plain-language)
 ```
 
 `etl/sources/indicatorBindings.mjs` is the join between the rubric's prose

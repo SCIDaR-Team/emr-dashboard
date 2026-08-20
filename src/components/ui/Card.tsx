@@ -23,6 +23,10 @@ export function Card({
 }
 
 interface SectionCardProps {
+  /** Scroll target for the header's section tabs. Setting it also marks the
+   *  panel with `data-section`, which is what carries the sticky-header
+   *  clearance — see the rule in globals.css. */
+  id?: string;
   title: string;
   subtitle?: string;
   action?: React.ReactNode;
@@ -38,8 +42,20 @@ interface SectionCardProps {
  * Titles are ink, not brand: colouring every heading was most of why the old
  * dashboard read as monotone green, and it left the accent with nothing to
  * distinguish.
+ *
+ * The header band is a fixed minimum height, and the action is centred in it
+ * rather than sharing the title's baseline. Both are about cards that sit side
+ * by side. Header height used to be whatever its tallest child happened to be,
+ * so a card carrying a `<select>` ran a few pixels deeper than the plain card
+ * beside it — and because a baseline row drags the title down with the control,
+ * the titles disagreed too. Every row in the two bodies then sat at a different
+ * offset for the whole length of the card. Domain scores against Sub-domain
+ * scores is the case you notice; the same pairing exists on the Overview.
+ *
+ * 52px is PageHeader's title row, for the same reason and to the same number.
  */
 export function SectionCard({
+  id,
   title,
   subtitle,
   action,
@@ -48,10 +64,15 @@ export function SectionCard({
   children,
 }: SectionCardProps) {
   return (
-    <section className={cn('card', className)}>
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-border px-4 py-3">
-        <h2 className="text-[13.5px] font-semibold text-foreground">{title}</h2>
-        {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
+    <section id={id} data-section={id ? '' : undefined} className={cn('card', className)}>
+      <div className="flex min-h-[52px] flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-4 py-3">
+        {/* Title and subtitle keep their own baseline relationship — the
+            subtitle is set smaller and reads as a continuation of the heading,
+            which top- or centre-aligning it would break. */}
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <h2 className="text-[13.5px] font-semibold text-foreground">{title}</h2>
+          {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
+        </div>
         {action && <div className="ml-auto">{action}</div>}
       </div>
       <div className={cn('p-4', bodyClassName)}>{children}</div>

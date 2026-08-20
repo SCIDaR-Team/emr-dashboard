@@ -13,10 +13,12 @@
  * Every one of the 305 LGA ids in public/data/lgas.json has an exact
  * counterpart in GRID3's ADM2 layer once minor spelling variants are
  * reconciled (verified: every primary state's LGA count matches GRID3's count
- * exactly). The 16 variants below were found by normalized-name diffing —
- * see the guide §17.6 for the wider 305-vs-205 LGA count question this does
- * not resolve (that one is about the ODK export's inflated LGA list, not this
- * boundary file).
+ * exactly). The 16 variants below were found by normalized-name diffing.
+ *
+ * That match is also what settled the old 305-vs-205 count question: the export
+ * was never inflated — GRID3 puts exactly 305 LGAs in these 12 states and the
+ * assessment reached all of them. See the note on COVERAGE in
+ * src/lib/constants.ts.
  *
  * Run: node scripts/convert-lga-boundaries.mjs
  */

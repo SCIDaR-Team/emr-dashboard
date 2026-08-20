@@ -1,8 +1,9 @@
 /**
  * Programme constants.
  *
- * Coverage figures come from the ERA Figma home screen; state lists from the
- * scored dataset and the XLSForm `choices` sheet.
+ * Coverage figures are reconciled against the assessment data — see the note on
+ * COVERAGE below; state lists from the scored dataset and the XLSForm `choices`
+ * sheet.
  */
 
 import type { EvidenceGrade } from './types';
@@ -10,29 +11,52 @@ import type { EvidenceGrade } from './types';
 export const PROGRAMME = {
   title: 'EMR Readiness Assessment',
   subtitle:
-    'Readiness findings across 36 states, 205 LGAs, and 2,808 healthcare facilities',
+    'Readiness findings across 36 states, 305 LGAs, and 2,804 healthcare facilities',
   partners: ['NPHCDA', 'NTBLCP', 'The Global Fund', 'Solina'],
 } as const;
 
 /**
- * NOTE — unresolved discrepancy, raised with the client and not yet settled.
+ * RESOLVED — the "205 LGAs / 2,808 facilities" discrepancy.
  *
- * `lgas` and `facilitiesSampled` below come from the ERA Figma home screen. The
- * shipped ETL output disagrees: `public/data/lgas.json` holds **305** LGAs,
- * every one with at least one facility, and they sum to the 2,804 scored
- * facilities exactly. So "205 LGAs" and "2,808 facilities" are the deck's
- * figures, not the data's.
+ * Both figures came from the ERA Figma home screen and were held here unchanged
+ * while the source of truth was in doubt. It no longer is. What the data says:
  *
- * Left as-is deliberately: these are published numbers and correcting them is
- * NPHCDA's call, not a silent edit. Anything computed on screen reads the real
- * data instead — see the LGA counts on Overview and Assessed States. Resolve
- * the source of truth before this reaches a report.
+ * **LGAs — 305, not 205.** Three independent sources agree exactly, per state
+ * and in total, once names are normalised for case and punctuation:
+ *
+ *   305   `public/data/lgas.json` (the scored ODK export)
+ *   305   `List of facilities for assessme` — the client's own planned sample
+ *   305   OCHA/GRID3 COD-AB ADM2, the authoritative boundary set
+ *
+ * GRID3 puts exactly 305 LGAs inside the 12 primary states, and the assessment
+ * reached every one of them. So 305 is not an inflated export — it is complete
+ * coverage, and no source anywhere produces 205. Treated as a transcription
+ * error in the deck (305 → 205) and corrected.
+ *
+ * **Facilities — 2,808 is the sample design, 2,804 is what was scored.** Both
+ * are real, and they mean different things. `List of facilities for assessme`
+ * holds exactly 2,808 rows; the scored master sheet holds exactly 2,804, all of
+ * them present in the plan. The gap is four named Kano facilities that were
+ * listed but never scored:
+ *
+ *   Gaya / Gamoji Health Post · Sumaila / Rumo Health Post
+ *   Sumaila / Dagora Health Post · Doguwa / Ririwai Basic Health Clinic
+ *
+ * So `facilitiesSampled` keeps 2,808 — that number is correct for what it names
+ * — and anything describing what was *assessed* must use `facilitiesScored`.
+ *
+ * Worth flagging to NPHCDA so the deck and any downstream report follow, since
+ * both figures are published. See docs/VALIDATION.md for the wider denominator
+ * problem, which this does not settle.
  */
 export const COVERAGE = {
   statesTotal: 37, // 36 + FCT
   statesPrimary: 12,
   statesSecondary: 25, // + FCT
-  lgas: 205,
+  /** Every LGA in the 12 primary states — the assessment reached all of them. */
+  lgas: 305,
+  /** Rows in `List of facilities for assessme` — the planned sample, not the
+   *  achieved one. Four of these were never scored. */
   facilitiesSampled: 2808,
   /** Rows carrying a computed archetype in ERA dataset_v4.xlsx. */
   facilitiesScored: 2804,
@@ -176,7 +200,6 @@ export const DATA_PATHS = {
   national: '/data/national.json',
   indicators: '/data/indicators.json',
   requirements: '/data/requirements.json',
-  labels: '/data/labels.json',
   explorerCube: '/data/explorer-cube.json',
   /** Fetched lazily — only when the explorer's indicator level is opened. */
   indicatorScores: '/data/indicator-scores.json',

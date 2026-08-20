@@ -40,6 +40,7 @@ import { buildRequirementColumns, REQUIREMENTS } from './lib/minimumRequirements
 import { buildServicePointColumns } from './lib/servicePoints.mjs';
 import { INDICATORS_V2 } from './lib/indicatorsV2.mjs';
 import { rollUp } from './lib/rollup.mjs';
+import { zoneDisagreements } from './lib/zones.mjs';
 import { buildExplorerCube } from './lib/explorerCube.mjs';
 import { attachAnsweredCounts, buildIndicatorMatrix } from './lib/indicatorMatrix.mjs';
 import { validate } from './lib/validate.mjs';
@@ -70,7 +71,12 @@ async function main() {
   const dataset = await readEraDatasetV2(source);
   console.log(`  ${dataset.rows.length} scored facilities, ${dataset.columns.length} merged columns`);
 
-  console.log('▸ Reading XLSForm survey + choices (for labels)');
+  // Only `choices` is load-bearing: it resolves state, LGA and facility slugs to
+  // their real names, applied to each facility record in buildFacilities(). The
+  // `survey` sheet's field labels used to be emitted as `labels.json` and were
+  // never fetched by anything, so that output is gone — the reader still parses
+  // them, cheaply, since it has the workbook open either way.
+  console.log('▸ Reading XLSForm survey + choices (for display names)');
   let form = { labels: {}, choiceLists: {}, lgasByState: new Map() };
   if (existsSync(labelsSource)) {
     form = await readXlsForm(labelsSource);
@@ -98,6 +104,19 @@ async function main() {
   console.log('▸ Rolling up to LGA, state and national');
   const { lgas, states, national } = rollUp(facilities, leadershipByState);
   console.log(`  ${lgas.length} LGAs, ${states.length} states`);
+
+  // Every state profile carries a zone so the national page can filter all 37,
+  // not just the 12 the facility rows cover. The table in zones.mjs is
+  // hand-declared, so hold it to the dataset wherever the dataset can speak.
+  const zoneDrift = zoneDisagreements(facilities);
+  if (zoneDrift.length) {
+    for (const d of zoneDrift) {
+      console.error(`  ✗ zone mismatch: ${d.state} declared ${d.declared}, dataset says ${d.observed}`);
+    }
+    if (strict) process.exit(1);
+  } else {
+    console.log('  zones agree with the dataset for every assessed state');
+  }
 
   console.log('▸ Building explorer cube');
   const { cube, nodes } = buildExplorerCube({ facilities, lgas, states, national });
@@ -159,9 +178,7 @@ async function main() {
   await write('national.json', national);
   await write('indicators.json', indicatorDefs);
   await write('requirements.json', REQUIREMENTS);
-  await write('labels.json', form.labels);
   await write('explorer-cube.json', cube);
-  await write('explorer-nodes.json', nodes);
   await write('indicator-scores.json', indicatorMatrix);
   await write('snapshot.json', {
     builtAt: new Date().toISOString(),

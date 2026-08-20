@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import { PageHeader } from '@/components/layout/PageHeader';
+import type { PageSection } from '@/components/layout/SectionTabs';
 import {
   BandBadge,
   EmptyState,
@@ -28,6 +29,8 @@ import { useDataContext } from '@/state/dataContext';
 import { useFacility } from '@/hooks/useFacility';
 import { isNotFound } from '@/hooks/useFetchJSON';
 import { useFilteredData } from '@/hooks/useFilteredData';
+import { useScopeFromNavigation } from '@/app/scopeNavigation';
+import { useFilterStore } from '@/store/filterStore';
 import {
   explainArchetype,
   FACILITY_CORE_THEMES,
@@ -48,6 +51,7 @@ import {
 import { FACILITY_THEMES, SUB_THEMES, THEME_BY_ID } from '@/lib/themes';
 import { formatScore, titleCaseName, formatCount } from '@/lib/format';
 import type {
+  Band,
   Facility,
   FacilitySummary,
   FacilityThemeId,
@@ -59,6 +63,15 @@ import type {
 const rank = (met: boolean | null) => (met === false ? 0 : met === true ? 1 : 2);
 
 const PRIORITY_RANK: Record<InvestmentPriority, number> = { high: 0, medium: 1, low: 2 };
+
+/** The tab strip under the header, once a facility is open. */
+const SECTIONS: PageSection[] = [
+  { id: 'verdict', label: 'Verdict' },
+  { id: 'score', label: 'Where the score comes from' },
+  { id: 'requirements', label: 'Minimum requirements' },
+  { id: 'needs', label: 'What it needs' },
+  { id: 'service-points', label: 'Service points' },
+];
 
 
 /**
@@ -74,7 +87,14 @@ const PRIORITY_RANK: Record<InvestmentPriority, number> = { high: 0, medium: 1, 
  */
 export default function FacilityScorecardPage() {
   const { uuid } = useParams<{ uuid: string }>();
-  const { allFacilities } = useFilteredData();
+  // A state clicked on the National Coverage map arrives as navigation state
+  // and becomes the page's scope here — see `scopeNavigation.ts`.
+  useScopeFromNavigation();
+  // Two populations, deliberately: `allFacilities` builds the cascading
+  // dropdowns, which must keep offering every state and LGA or the scope
+  // becomes a one-way door; `facilities` is that population already narrowed by
+  // the scope, and is what the picker suggests from.
+  const { allFacilities, facilities: scopedFacilities } = useFilteredData();
   const { requirementDefs } = useDataContext();
   const { data: facility, isLoading, error, refetch } = useFacility(uuid);
   const sheetRef = useRef<HTMLDivElement>(null);
@@ -180,6 +200,10 @@ export default function FacilityScorecardPage() {
       <PageHeader
         title="Facility Scorecard"
         subtitle="One facility, its gates and its actions"
+        // Only once a scorecard is open. The picker that stands in its place is
+        // a single panel with nothing to navigate between, and a strip of tabs
+        // pointing at sections that do not exist yet is worse than none.
+        sections={facility ? SECTIONS : undefined}
       >
         <CascadingLocationFilter facilities={allFacilities} />
         {exportGroups && <ExportMenu groups={exportGroups} className="ml-auto" />}
@@ -187,7 +211,7 @@ export default function FacilityScorecardPage() {
 
       <div className="space-y-4 p-4 sm:p-5">
         {!uuid ? (
-          <FacilityPicker facilities={allFacilities} />
+          <FacilityPicker facilities={scopedFacilities} total={allFacilities.length} />
         ) : isLoading && !facility ? (
           <PageSkeleton />
         ) : /*
@@ -215,7 +239,9 @@ export default function FacilityScorecardPage() {
           />
         ) : (
           <div ref={sheetRef} className="space-y-4">
-            <GatePanel facility={facility} />
+            <div id="verdict" data-section>
+              <GatePanel facility={facility} />
+            </div>
 
             {/* Where the score comes from — the sub-theme bars behind each
                 domain figure. These replace the four ECharts donuts: a donut
@@ -223,7 +249,7 @@ export default function FacilityScorecardPage() {
                 seven sub-scores underneath it, and the reader could not see
                 that Technical Infrastructure is dragged down by resilience
                 rather than by devices. */}
-            <section>
+            <section id="score" data-section>
               <p className="eyebrow">Where the score comes from</p>
               <div className="mt-2 grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
                 {FACILITY_THEMES.map((theme) => {
@@ -268,7 +294,7 @@ export default function FacilityScorecardPage() {
                 by outcome puts the work at the top of each column, and the
                 met items recede rather than disappearing — "we checked and it
                 passed" is worth seeing. */}
-            <section>
+            <section id="requirements" data-section>
               <p className="eyebrow">
                 Minimum requirements ·{' '}
                 {facility.minimumRequirements.filter((r) => r.met === true).length} of{' '}
@@ -299,6 +325,7 @@ export default function FacilityScorecardPage() {
             </section>
 
             <SectionCard
+              id="needs"
               title="What this facility needs"
               subtitle={`${facility.investments.length} actions, ordered by priority`}
               bodyClassName="p-0"
@@ -383,6 +410,7 @@ export default function FacilityScorecardPage() {
             </SectionCard>
 
             <SectionCard
+              id="service-points"
               title="Service points"
               subtitle="Device, digital system and staffing at each point of care"
             >
@@ -403,18 +431,67 @@ export default function FacilityScorecardPage() {
  * what a scorecard looks like". Most first visits are the second question, so
  * the empty state carries a few facilities you can open in one click.
  *
- * They are drawn from the Ready band on purpose: it holds 110 of 2,804
- * facilities, so it is the hardest band to reach by picking at random, and a
- * scorecard that clears every gate is the most legible introduction to what the
- * gates are. The list is sorted by name so the same four appear every visit —
- * a shuffling set of examples reads as data changing underneath you.
+ * The four are drawn from the *scoped* population, not the national one. A user
+ * who clicked Oyo on the national map has already said which places they mean,
+ * and four suggestions from Imo, Jigawa and Rivers answer a question nobody
+ * asked — worse, they read as the filter having done nothing. Narrowing to an
+ * LGA narrows them again.
+ *
+ * Order is readiness first, then score, then name. Ready is the most legible
+ * introduction to what the gates are — a scorecard that clears every one of
+ * them — but it holds only 110 of 2,804 facilities, so most states have none
+ * and a Ready-only list would empty out exactly where the scope is tightest.
+ * Falling through to the best-scored facility in scope keeps four cards on the
+ * page at every level. Every tiebreak is deterministic, so the same scope shows
+ * the same four on every visit: a shuffling set of examples reads as data
+ * changing underneath you.
  */
-function FacilityPicker({ facilities }: { facilities: FacilitySummary[] }) {
+const PICK_RANK: Record<Band, number> = { ready: 0, moderately_ready: 1, not_ready: 2 };
+
+function FacilityPicker({
+  facilities,
+  total,
+}: {
+  facilities: FacilitySummary[];
+  total: number;
+}) {
+  const states = useFilterStore((s) => s.states);
+  const lgas = useFilterStore((s) => s.lgas);
+  const setStates = useFilterStore((s) => s.setStates);
+
+  /**
+   * What the scope is, said the way a person would say it.
+   *
+   * Null means national — the page then makes no claim about place at all,
+   * rather than announcing "Facilities in 12 states", which is a filter
+   * describing itself rather than telling the reader anything.
+   */
+  const scopeLabel = useMemo(() => {
+    const place = (name: string) => titleCaseName(name);
+    if (lgas.length === 1 && states.length === 1) {
+      return `${place(lgas[0]!)}, ${states[0]}`;
+    }
+    if (lgas.length > 1 && states.length === 1) {
+      return `${lgas.length} LGAs in ${states[0]}`;
+    }
+    if (states.length === 1) return `${states[0]} State`;
+    if (states.length > 1) return `${states.length} states`;
+    return null;
+  }, [states, lgas]);
+
   const picks = useMemo(
     () =>
       facilities
-        .filter((f) => f.archetype === 'ready')
-        .sort((a, b) => a.name.localeCompare(b.name))
+        .slice()
+        .sort((a, b) => {
+          const band =
+            (a.archetype ? PICK_RANK[a.archetype] : 3) -
+            (b.archetype ? PICK_RANK[b.archetype] : 3);
+          if (band !== 0) return band;
+          const score = (b.averageDomainScore ?? -1) - (a.averageDomainScore ?? -1);
+          if (score !== 0) return score;
+          return a.name.localeCompare(b.name);
+        })
         .slice(0, 4),
     [facilities],
   );
@@ -423,10 +500,15 @@ function FacilityPicker({ facilities }: { facilities: FacilitySummary[] }) {
     <div className="grid place-items-center rounded-card border border-dashed border-border px-6 py-16 text-center">
       <div className="max-w-xl">
         <ClipboardList className="mx-auto h-6 w-6 text-muted-foreground" aria-hidden />
-        <p className="mt-3 font-medium text-foreground">Choose a facility</p>
+        <p className="mt-3 font-medium text-foreground">
+          {scopeLabel ? `Facilities in ${scopeLabel}` : 'Choose a facility'}
+        </p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Pick a state, then an LGA, then a facility from the bar above — or jump
-          straight to one of these.
+          {picks.length === 0
+            ? 'Nothing in this scope has a scorecard. Widen the State or LGA selection above.'
+            : scopeLabel
+              ? 'Narrow further with the LGA dropdown above, pick from the facility list — or open one of these.'
+              : 'Pick a state, then an LGA, then a facility from the bar above — or jump straight to one of these.'}
         </p>
 
         {picks.length > 0 && (
@@ -437,15 +519,40 @@ function FacilityPicker({ facilities }: { facilities: FacilitySummary[] }) {
                 to={`/facilities/${f.uuid}`}
                 className="border border-input bg-surface px-3 py-2 text-sm text-foreground hover:border-brand-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
               >
-                {titleCaseName(f.name)}{' '}
-                <span className="text-muted-foreground">{f.state}</span>
+                {titleCaseName(f.name)}
+                {/* Whichever level still varies across the four. Under one
+                    state that is the LGA, not the state — and under one LGA it
+                    is nothing, so the card drops the qualifier rather than
+                    repeating the heading four times. */}
+                {lgas.length !== 1 && (
+                  <span className="ml-1 text-muted-foreground">
+                    {states.length === 1 ? titleCaseName(f.lga) : f.state}
+                  </span>
+                )}
               </Link>
             ))}
           </div>
         )}
 
         <p className="mono mt-4 text-[11px] text-muted-foreground">
-          {formatCount(facilities.length)} facilities have a scorecard.
+          {scopeLabel ? (
+            <>
+              {formatCount(facilities.length)} of {formatCount(total)} facilities are in{' '}
+              {scopeLabel}.{' '}
+              {/* The scope is persisted and survives a reload, so the way out of
+                  it has to be on the page that applied it — otherwise a user who
+                  drilled in from the map has no obvious route back to national. */}
+              <button
+                type="button"
+                onClick={() => setStates([])}
+                className="underline underline-offset-2 hover:text-foreground"
+              >
+                Show all states
+              </button>
+            </>
+          ) : (
+            `${formatCount(total)} facilities have a scorecard.`
+          )}
         </p>
       </div>
     </div>

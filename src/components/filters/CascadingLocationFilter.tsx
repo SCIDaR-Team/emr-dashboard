@@ -25,10 +25,11 @@ export interface CascadingLocationFilterProps {
  * leads. Keeping that distinction visible is why the third control is a
  * different kind of widget rather than a third dropdown.
  *
- * The cascade is data-driven, not from the XLSForm `choices` sheet: the two
- * disagree on LGA count (305 distinct values in the export against 205 on the
- * prototype), and offering an LGA with no assessed facility behind it produces
- * an empty view with no explanation. Every option here has facilities.
+ * The cascade is data-driven, not from the XLSForm `choices` sheet: `choices`
+ * lists every LGA in Nigeria, and offering an LGA with no assessed facility
+ * behind it produces an empty view with no explanation. Every option here has
+ * facilities. (For the 12 primary states the two agree anyway — 305 LGAs, all
+ * of them assessed; see the note on COVERAGE in lib/constants.ts.)
  */
 export function CascadingLocationFilter({
   facilities,

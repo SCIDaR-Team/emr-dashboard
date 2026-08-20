@@ -380,6 +380,13 @@ export interface AreaProfile {
   level: GeoLevel;
   name: string;
   parentId: string | null;
+  /**
+   * Geopolitical zone. Set on every state, assessed or not — National Coverage
+   * filters all 37 by zone, and the facility rows only carry a zone for the 12
+   * that were visited. Null at LGA and national level, which have no zone of
+   * their own. Title case, identical to `FacilitySummary.zone`.
+   */
+  zone?: string | null;
   evidenceGrade: EvidenceGrade;
 
   facilityCount: number;

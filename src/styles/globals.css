@@ -199,6 +199,19 @@
     @apply bg-page text-foreground font-sans;
   }
 
+  /*
+   * Anything the section tabs can scroll to.
+   *
+   * The page header is sticky, so a section scrolled to `block: start` would
+   * otherwise land *behind* it — the reader arrives at a panel whose heading is
+   * hidden under the title bar. The header measures itself into
+   * --page-header-h (PageHeader.tsx); the fallback is the title row alone,
+   * which is the shortest the header can be.
+   */
+  [data-section] {
+    scroll-margin-top: calc(var(--page-header-h, 52px) + 12px);
+  }
+
   /* Respect the OS setting for anyone who has asked for reduced motion. */
   @media (prefers-reduced-motion: reduce) {
     *,

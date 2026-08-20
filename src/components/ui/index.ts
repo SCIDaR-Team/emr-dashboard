@@ -13,6 +13,7 @@ export {
   Tile,
 } from './Meter';
 export { BandBadge, BandIcon, MaturityBadge } from './BandBadge';
+export { DistributionBar } from './DistributionBar';
 export { Badge, CountBadge } from './Badge';
 export type { BadgeProps, BadgeTone } from './Badge';
 export { Skeleton, PageSkeleton, EmptyState, LoadError } from './Skeleton';

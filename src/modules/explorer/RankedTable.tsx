@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { ArrowDown, ArrowRight, ArrowUp, FileSpreadsheet, FileText, Table2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { BAND_LABEL, BANDS } from '@/lib/bands';
-import { BandBadge, ExportMenu } from '@/components/ui';
+import { BandBadge, DistributionBar, ExportMenu } from '@/components/ui';
 import { AGGREGATION_LABEL, formatMetric } from '@/lib/explorerCube';
 import {
   exportCSV,
@@ -15,7 +15,6 @@ import {
 import { formatCount, percentOf } from '@/lib/format';
 import { describeThemeNode } from '@/lib/themes';
 import { useDataContext } from '@/state/dataContext';
-import { DistributionBar } from './DistributionBar';
 import type { ChildLevel, ExplorerUnit } from '@/hooks/useExplorerData';
 import type { Aggregation, ThemeNodeId } from '@/lib/types';
 
@@ -428,7 +427,8 @@ export function RankedTable({
                         ))}
                       <td className="hidden w-32 px-3 py-2.5 2xl:table-cell">
                         <DistributionBar
-                          cell={unit.cell}
+                          distribution={unit.cell.distribution}
+                          scored={unit.cell.scored}
                           size="sm"
                           showLegend={false}
                         />
