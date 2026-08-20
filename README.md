@@ -20,8 +20,13 @@ remaining 25 plus the FCT by secondary desk review.
 
 ## Stack
 
-React 18 · TypeScript 5 · Vite 5 · Tailwind 3 · ECharts 5 · Zustand 4 ·
-React Router 6 · Netlify (static)
+React 18 · TypeScript 5 · Vite 5 · Tailwind 3 · Zustand 4 ·
+React Router 7 · Netlify (static)
+
+No charting library. Every measure on screen is a bar, a track or a five-step
+meter built from plain DOM in `src/components/ui/Meter.tsx`, and the maps are
+hand-projected SVG — so the readiness palette, its textures and the dark scheme
+are defined once in CSS and inherited, rather than restated in a canvas theme.
 
 No backend. The assessment is complete and the dataset is fixed, so all scoring
 and aggregation happens at build time in `etl/` and the app serves precomputed

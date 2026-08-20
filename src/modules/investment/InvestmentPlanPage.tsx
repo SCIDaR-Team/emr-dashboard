@@ -1,0 +1,543 @@
+import { useMemo, useState } from 'react';
+import { AlertTriangle, Download } from 'lucide-react';
+import { PageHeader } from '@/components/layout/PageHeader';
+import {
+  LoadError,
+  PageSkeleton,
+  SectionCard,
+  Tile,
+  TileRow,
+} from '@/components/ui';
+import { useDataContext } from '@/state/dataContext';
+import { cn } from '@/lib/cn';
+import { formatCount, formatNaira, formatScore } from '@/lib/format';
+import { THEMES, THEME_BY_ID } from '@/lib/themes';
+import type { InvestmentItem, ThemeId } from '@/lib/types';
+import {
+  lineTotal,
+  rateFor,
+  unitOf,
+  usesIllustrative,
+  type RateContext,
+} from './investmentRates';
+
+const PRIORITY_RANK: Record<string, number> = { high: 0, medium: 1, low: 2 };
+
+/**
+ * Module 5 — Investment Plan.
+ *
+ * The costed schedule used to be a slab at the bottom of State Summary, below
+ * a map and a ranked table, where nobody building a budget would look for it.
+ * It is its own destination now, with the two columns the old table never had:
+ * unit cost and total cost.
+ *
+ * On the costs themselves, see `investmentRates.ts` — the source data has none,
+ * so unit cost is an input and every total is honestly "pending" until real
+ * rates exist. The placeholder rates are opt-in and loudly labelled.
+ */
+export default function InvestmentPlanPage() {
+  const { national } = useDataContext();
+  const profile = national.data;
+
+  const [entered, setEntered] = useState<Record<string, string>>({});
+  const [illustrative, setIllustrative] = useState(false);
+  const ctx: RateContext = useMemo(
+    () => ({ entered, illustrative }),
+    [entered, illustrative],
+  );
+
+  const items = useMemo(() => profile?.investments ?? [], [profile]);
+
+  const totals = useMemo(() => computeTotals(items, ctx), [items, ctx]);
+  const showWarning = usesIllustrative(items, ctx);
+
+  const grouped = useMemo(() => {
+    return THEMES.map((theme) => ({
+      theme,
+      rows: items
+        .filter((i) => i.themeId === theme.id)
+        .sort(
+          (a, b) =>
+            (PRIORITY_RANK[a.priority] ?? 3) - (PRIORITY_RANK[b.priority] ?? 3) ||
+            (b.quantity ?? 0) - (a.quantity ?? 0),
+        ),
+    })).filter((g) => g.rows.length);
+  }, [items]);
+
+  if (national.isLoading) return <PageSkeleton />;
+  if (national.error) {
+    return (
+      <LoadError
+        what="the investment schedule"
+        error={national.error}
+        onRetry={national.refetch}
+      />
+    );
+  }
+  if (!profile) return <LoadError what="the investment schedule" />;
+
+  const highPriority = items.filter((i) => i.priority === 'high').length;
+  const notReady = profile.facilityCount - (profile.archetypeDistribution.ready ?? 0);
+
+  return (
+    <>
+      <PageHeader
+        title="Investment Plan"
+        subtitle="What it will take, itemised and costed"
+        actions={
+          <button
+            type="button"
+            className="mono inline-flex items-center gap-1.5 border border-input px-2.5 py-1.5 text-[11px] text-muted-foreground transition-colors hover:border-muted-foreground hover:text-foreground"
+          >
+            <Download className="h-3 w-3" aria-hidden /> Export XLSX
+          </button>
+        }
+      />
+
+      <div className="space-y-4 p-4 sm:p-5">
+        {showWarning && (
+          <div
+            role="note"
+            className="flex items-start gap-3 border border-moderate bg-moderate-wash px-3.5 py-3"
+          >
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-moderate" aria-hidden />
+            <div className="text-[12.5px] text-foreground">
+              <strong className="font-semibold">
+                These naira figures are illustrative placeholders, not NPHCDA rates.
+              </strong>
+              <p className="mt-0.5 text-muted-foreground">
+                The assessment workbook publishes no cost table, so every unit cost in the
+                source data is null. The rates below were invented to show the costed layout
+                — do not quote any total from this view. Type over any cell to enter a real
+                rate, or switch the placeholders off.
+              </p>
+            </div>
+          </div>
+        )}
+
+        <TileRow className="sm:grid-cols-2 xl:grid-cols-4">
+          <Tile
+            label="Total costed items"
+            value={formatCount(totals.quantity)}
+            note={`${items.length} distinct actions`}
+          />
+          <Tile
+            label="Facilities with at least one action"
+            value={formatCount(notReady)}
+            suffix={`of ${formatCount(profile.facilityCount)}`}
+            note="Every non-ready facility"
+          />
+          <Tile
+            label="High-priority actions"
+            value={String(highPriority)}
+            suffix={`of ${items.length}`}
+            note="Blocking EMR deployment"
+          />
+          <Tile
+            label={`Estimated total${showWarning ? ' · illustrative' : ''}`}
+            value={totals.grand != null ? formatNaira(totals.grand, true) : '—'}
+            note={
+              totals.priced === 0
+                ? 'Awaiting a signed-off cost table'
+                : totals.priced < items.length
+                  ? `${totals.priced} of ${items.length} actions priced`
+                  : showWarning
+                    ? 'From placeholder rates'
+                    : 'From entered rates'
+            }
+          />
+        </TileRow>
+
+        <div className="grid items-start gap-4 xl:grid-cols-2">
+          <SectionCard
+            title="Items by domain"
+            subtitle={`${formatCount(totals.quantity)} units across ${items.length} actions`}
+          >
+            <div className="space-y-2.5">
+              {THEMES.map((theme) => {
+                const q = totals.byTheme[theme.id]?.quantity ?? 0;
+                return (
+                  <div key={theme.id}>
+                    <div className="mb-1 flex items-baseline justify-between gap-3 text-[12.5px]">
+                      <span className={q ? 'text-muted-foreground' : 'text-muted-foreground/60'}>
+                        {theme.label}
+                      </span>
+                      <span className="mono font-semibold text-foreground">
+                        {q ? formatCount(q) : 'none'}
+                      </span>
+                    </div>
+                    <div className="h-[7px] rounded-[1px] bg-surface-sunk">
+                      <span
+                        className={cn(
+                          'block h-full rounded-r-[3px]',
+                          q ? 'bg-score-3' : 'bg-nodata',
+                        )}
+                        style={{ width: `${q ? (q / totals.maxQuantity) * 100 : 0}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="mt-4 border-l-2 border-brand-500 pl-4">
+              <p className="mono mb-1 text-[10px] uppercase tracking-[0.12em] text-brand-500">
+                The hole in the plan
+              </p>
+              <p className="text-[13px] text-muted-foreground">
+                <strong className="font-semibold text-foreground">
+                  Leadership &amp; Governance carries zero costed items
+                </strong>{' '}
+                while scoring {formatScore(profile.themeScores.leadership_governance, 2)} —
+                the weakest domain nationally. It is measured at state level and the
+                instrument only triggers actions at facility level, so the weakest domain
+                has no line to fund.
+              </p>
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            title="Cost by domain"
+            subtitle={
+              showWarning
+                ? 'illustrative rates'
+                : totals.priced
+                  ? 'entered rates'
+                  : 'awaiting rates'
+            }
+          >
+            {totals.grand ? (
+              <>
+                <div className="space-y-2.5">
+                  {THEMES.map((theme) => {
+                    const cost = totals.byTheme[theme.id]?.cost ?? 0;
+                    return (
+                      <div key={theme.id}>
+                        <div className="mb-1 flex items-baseline justify-between gap-3 text-[12.5px]">
+                          <span
+                            className={cost ? 'text-muted-foreground' : 'text-muted-foreground/60'}
+                          >
+                            {theme.label}
+                          </span>
+                          <span className="mono font-semibold text-foreground">
+                            {cost ? formatNaira(cost, true) : '—'}
+                          </span>
+                        </div>
+                        <div className="h-[7px] rounded-[1px] bg-surface-sunk">
+                          <span
+                            className="block h-full rounded-r-[3px] bg-score-3"
+                            style={{ width: `${(cost / totals.maxCost) * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="mono mt-3 text-[10.5px] leading-relaxed text-muted-foreground">
+                  Share of spend is not share of items — the heaviest unit rates sit on power
+                  and devices, so Technical Infrastructure takes a larger slice of cost than
+                  of volume.
+                </p>
+              </>
+            ) : (
+              <div className="py-8 text-center">
+                <p className="text-sm font-semibold text-foreground">No rates entered yet</p>
+                <p className="mx-auto mt-1.5 max-w-[42ch] text-[13px] text-muted-foreground">
+                  The source data has no unit costs, so this panel has nothing to total. Enter
+                  rates in the table below, or switch on the placeholder rates to see the
+                  costed layout.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setIllustrative(true)}
+                  className="mt-4 border border-brand-500 bg-brand-500 px-3 py-1.5 text-xs font-semibold text-surface transition-colors hover:bg-brand-600 hover:border-brand-600"
+                >
+                  Use illustrative rates
+                </button>
+              </div>
+            )}
+          </SectionCard>
+        </div>
+
+        <SectionCard
+          title="Itemised schedule"
+          subtitle={`${items.length} actions`}
+          bodyClassName="p-0"
+        >
+          <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-2.5">
+            <span className="mono text-[9.5px] uppercase tracking-[0.11em] text-muted-foreground">
+              Unit rates
+            </span>
+            <div className="flex border border-input">
+              <button
+                type="button"
+                aria-pressed={!illustrative}
+                onClick={() => setIllustrative(false)}
+                className={cn(
+                  'border-r border-input px-2.5 py-1 text-xs transition-colors',
+                  !illustrative
+                    ? 'bg-brand-50 font-semibold text-foreground'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                From your data
+              </button>
+              <button
+                type="button"
+                aria-pressed={illustrative}
+                onClick={() => setIllustrative(true)}
+                className={cn(
+                  'px-2.5 py-1 text-xs transition-colors',
+                  illustrative
+                    ? 'bg-brand-50 font-semibold text-foreground'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                Illustrative placeholders
+              </button>
+            </div>
+            {Object.keys(entered).length > 0 && (
+              <button
+                type="button"
+                onClick={() => setEntered({})}
+                className="mono text-[10px] uppercase tracking-[0.08em] text-brand-500 hover:text-brand-600"
+              >
+                Clear my entries ({Object.keys(entered).length})
+              </button>
+            )}
+            <span className="mono ml-auto text-[10.5px] text-muted-foreground">
+              Type in any unit-cost cell to price an action
+            </span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-[13px]">
+              <caption className="sr-only">
+                Investment actions with quantity, unit cost and total cost
+              </caption>
+              <thead>
+                <tr className="mono text-[9.5px] uppercase tracking-[0.11em] text-muted-foreground">
+                  <th scope="col" className="border-b border-input px-4 py-2 text-left font-normal">
+                    Action
+                  </th>
+                  <th scope="col" className="border-b border-input py-2 pr-3 text-right font-normal">
+                    Priority
+                  </th>
+                  <th scope="col" className="border-b border-input py-2 pr-3 text-right font-normal">
+                    Facilities
+                  </th>
+                  <th scope="col" className="border-b border-input py-2 pr-3 text-right font-normal">
+                    Quantity
+                  </th>
+                  <th scope="col" className="border-b border-input py-2 pr-3 text-right font-normal">
+                    Unit
+                  </th>
+                  <th scope="col" className="border-b border-input py-2 pr-3 text-right font-normal">
+                    Unit cost (₦)
+                  </th>
+                  <th scope="col" className="border-b border-input py-2 pr-4 text-right font-normal">
+                    Total cost (₦)
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {grouped.map(({ theme, rows }) => {
+                  const sub = totals.byTheme[theme.id];
+                  return (
+                    <DomainRows
+                      key={theme.id}
+                      themeId={theme.id}
+                      rows={rows}
+                      ctx={ctx}
+                      subtotal={sub?.cost ?? 0}
+                      pricedRows={sub?.priced ?? 0}
+                      quantity={sub?.quantity ?? 0}
+                      onRate={(id, value) =>
+                        setEntered((prev) => {
+                          const next = { ...prev };
+                          if (value === '') delete next[id];
+                          else next[id] = value;
+                          return next;
+                        })
+                      }
+                    />
+                  );
+                })}
+                <tr className="border-t-2 border-brand-500 bg-brand-50 font-semibold">
+                  <td className="px-4 py-2.5" colSpan={3}>
+                    Grand total
+                  </td>
+                  <td className="mono py-2.5 pr-3 text-right">{formatCount(totals.quantity)}</td>
+                  <td />
+                  <td />
+                  <td className="mono py-2.5 pr-4 text-right">
+                    {totals.grand != null ? (
+                      formatNaira(totals.grand)
+                    ) : (
+                      <span className="font-normal italic text-muted-foreground">pending</span>
+                    )}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p className="mono border-t border-border px-4 py-3 text-[10.5px] leading-relaxed text-muted-foreground">
+            {totals.priced > 0 && totals.priced < items.length
+              ? '* Subtotal covers only the priced actions in that domain. '
+              : ''}
+            Quantity units differ by action — devices and fans are counted per unit, most
+            others per facility, so the Unit column names what a rate buys.
+          </p>
+        </SectionCard>
+      </div>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+
+function DomainRows({
+  themeId,
+  rows,
+  ctx,
+  subtotal,
+  pricedRows,
+  quantity,
+  onRate,
+}: {
+  themeId: ThemeId;
+  rows: InvestmentItem[];
+  ctx: RateContext;
+  subtotal: number;
+  pricedRows: number;
+  quantity: number;
+  onRate: (id: string, value: string) => void;
+}) {
+  return (
+    <>
+      <tr className="bg-surface-sunk">
+        <td colSpan={7} className="border-t border-input px-4 pb-1.5 pt-3 font-semibold">
+          {THEME_BY_ID[themeId].label}{' '}
+          <span className="mono text-[10.5px] font-normal text-muted-foreground">
+            — {rows.length} actions · {formatCount(quantity)} units
+          </span>
+        </td>
+      </tr>
+
+      {rows.map((item) => {
+        const rate = rateFor(item.id, ctx);
+        const total = lineTotal(item, ctx);
+        const typed = ctx.entered[item.id];
+        const isPlaceholder = (typed == null || typed === '') && rate != null;
+
+        return (
+          <tr key={item.id} className="border-b border-border hover:bg-surface-sunk">
+            <td className="px-4 py-2">{item.label}</td>
+            <td className="py-2 pr-3 text-right">
+              <span
+                className={cn(
+                  'mono border px-1.5 py-0.5 text-[9px] uppercase tracking-[0.1em]',
+                  item.priority === 'high'
+                    ? 'border-notready text-notready'
+                    : 'border-input text-muted-foreground',
+                )}
+              >
+                {item.priority}
+              </span>
+            </td>
+            <td className="mono py-2 pr-3 text-right text-xs">
+              {formatCount(item.facilityCount ?? null)}
+            </td>
+            <td className="mono py-2 pr-3 text-right text-xs">{formatCount(item.quantity)}</td>
+            <td className="mono py-2 pr-3 text-right text-[10px] text-muted-foreground">
+              {unitOf(item.id)}
+            </td>
+            <td className="py-2 pr-3 text-right">
+              <input
+                type="text"
+                inputMode="numeric"
+                aria-label={`Unit cost for ${item.label}`}
+                placeholder="not set"
+                value={typed ?? (isPlaceholder ? String(rate) : '')}
+                onChange={(e) => onRate(item.id, e.target.value.replace(/[^\d.]/g, ''))}
+                className={cn(
+                  'mono w-[104px] border bg-surface px-2 py-1 text-right text-xs text-foreground',
+                  'placeholder:italic placeholder:text-muted-foreground',
+                  'focus:border-brand-500 focus:outline-none',
+                  isPlaceholder ? 'border-dashed border-input' : 'border-input',
+                )}
+              />
+            </td>
+            <td className="mono py-2 pr-4 text-right text-xs">
+              {total != null ? (
+                formatNaira(total)
+              ) : (
+                <span className="italic text-muted-foreground">pending</span>
+              )}
+            </td>
+          </tr>
+        );
+      })}
+
+      <tr className="bg-surface-sunk font-semibold">
+        <td
+          colSpan={6}
+          className="mono border-t border-input py-2 pr-3 text-right text-[10.5px] uppercase tracking-[0.08em] text-muted-foreground"
+        >
+          {THEME_BY_ID[themeId].label} subtotal
+        </td>
+        <td className="mono border-t border-input py-2 pr-4 text-right text-xs">
+          {pricedRows ? (
+            <>
+              {formatNaira(subtotal)}
+              {pricedRows < rows.length && ' *'}
+            </>
+          ) : (
+            <span className="font-normal italic text-muted-foreground">pending</span>
+          )}
+        </td>
+      </tr>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+
+interface ThemeTotals {
+  quantity: number;
+  cost: number;
+  priced: number;
+  rows: number;
+}
+
+function computeTotals(items: InvestmentItem[], ctx: RateContext) {
+  const byTheme: Partial<Record<ThemeId, ThemeTotals>> = {};
+  let quantity = 0;
+  let grand = 0;
+  let priced = 0;
+
+  for (const item of items) {
+    const bucket = (byTheme[item.themeId] ??= { quantity: 0, cost: 0, priced: 0, rows: 0 });
+    bucket.rows += 1;
+    bucket.quantity += item.quantity ?? 0;
+    quantity += item.quantity ?? 0;
+
+    const total = lineTotal(item, ctx);
+    if (total != null) {
+      bucket.cost += total;
+      bucket.priced += 1;
+      grand += total;
+      priced += 1;
+    }
+  }
+
+  return {
+    byTheme,
+    quantity,
+    priced,
+    grand: priced ? grand : null,
+    maxQuantity: Math.max(1, ...Object.values(byTheme).map((t) => t?.quantity ?? 0)),
+    maxCost: Math.max(1, ...Object.values(byTheme).map((t) => t?.cost ?? 0)),
+  };
+}

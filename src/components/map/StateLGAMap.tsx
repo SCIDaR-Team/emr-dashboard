@@ -19,6 +19,7 @@ import {
   useHatchPatternId,
   useBandPatternId,
   bandPatternFill,
+  scoreStepFill,
   textureUnit,
   type GeoDatum,
 } from './mapTypes';
@@ -196,7 +197,10 @@ export function StateLGAMap({
             const outlined = isSelected || isFocused;
             // Colour plus texture — see BandPattern. The Tailwind fill class
             // must stay off a patterned path or CSS overrides the attribute.
-            const bandFill = bandPatternFill(bandId, datum?.band);
+            // A sequential step wins over the band when the caller supplied
+            // one — see the note on GeoDatum.step.
+            const bandFill =
+              scoreStepFill(datum?.step) ?? bandPatternFill(bandId, datum?.band);
 
             return (
               <path

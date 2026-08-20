@@ -15,6 +15,9 @@ const AssessmentStatesPage = lazy(
 const FacilityScorecardPage = lazy(
   () => import('@/modules/facility/FacilityScorecardPage'),
 );
+const InvestmentPlanPage = lazy(
+  () => import('@/modules/investment/InvestmentPlanPage'),
+);
 const ExplorerPage = lazy(() => import('@/modules/explorer/ExplorerPage'));
 const ReportBuilderPage = lazy(() => import('@/modules/reports/ReportBuilderPage'));
 
@@ -61,6 +64,7 @@ export default function App() {
               />
               <Route path="/facilities" element={page(<FacilityScorecardPage />)} />
               <Route path="/facilities/:uuid" element={page(<FacilityScorecardPage />)} />
+              <Route path="/investment" element={page(<InvestmentPlanPage />)} />
               <Route path="/explore" element={page(<ExplorerPage />)} />
               <Route path="/reports" element={page(<ReportBuilderPage />)} />
               <Route path="*" element={<Navigate to="/" replace />} />

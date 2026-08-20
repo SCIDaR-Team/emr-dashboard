@@ -8,144 +8,181 @@
  * Values are HSL channel triples (no hsl() wrapper) so Tailwind can apply
  * opacity modifiers — see the <alpha-value> placeholders in tailwind.config.js.
  *
- * The palette is taken from the ERA Figma prototype: a deep forest green brand
- * with a three-colour readiness scale (green / amber / red). Those three are
- * load-bearing — they encode Ready / Moderately ready / Not ready everywhere in
- * the app — so they are defined once here and reached only via
- * statusColor() in src/lib/bands.ts.
+ * ---------------------------------------------------------------------------
+ * Two colour systems, kept apart. This is the load-bearing rule of the redesign.
+ *
+ *   1. READINESS BANDS (green / amber / red) are STATUS. They are the only
+ *      saturated hues in the product, so colour always means readiness and
+ *      never anything else. Each is paired with a texture and a label, because
+ *      red vs green measures ΔE 7.0 under deuteranopia — inside the warn band,
+ *      and not allowed to carry meaning by hue alone.
+ *
+ *   2. MAGNITUDE (a 1–5 score, a share, a maturity level) rides a single-hue
+ *      BLUE ORDINAL RAMP, --s1 → --s5. Blue also carries every interactive
+ *      affordance: links, active nav, focus, filled buttons.
+ *
+ * So the reader learns two rules and never needs a third: hue means band,
+ * darkness means score. The previous palette spent green on the brand, the
+ * sidebar, every heading, the primary button *and* the Ready band, which meant
+ * green had stopped meaning "ready" — the one job it cannot fail at.
+ *
+ * Neutrals carry a slight green bias. They read as chosen rather than
+ * inherited, and they keep a nod to the original identity now that green is no
+ * longer doing duty as furniture.
+ * ---------------------------------------------------------------------------
  */
 
 @layer base {
   :root {
-    --page: 150 14% 97%;
-    --surface: 0 0% 100%;
-    --foreground: 158 44% 12%;
-    --muted: 150 12% 94%;
-    --muted-foreground: 155 8% 42%;
-    --border: 150 12% 89%;
-    --input: 150 12% 89%;
-    --ring: 152 41% 30%;
+    --page: 100 9% 96%;
+    --surface: 80 20% 99%;
+    --surface-sunk: 90 8% 93%;
+    --foreground: 160 12% 8%;
+    --muted: 90 8% 93%;
+    --muted-foreground: 155 5% 36%;
+    --border: 100 8% 89%;
+    --input: 100 8% 82%;
+    --ring: 214 68% 50%;
 
     /*
-     * The brand ramp is defined by role, not by lightness, because dark mode
-     * cannot simply invert it:
+     * The brand ramp is unchanged in *role* — the codebase reads it as
      *   50 / 100  subtle washes behind content
      *   500       primary accent — borders, active states, filled controls
      *   600       stronger accent, hover
      *   700       heading text
      *   900       strongest text
-     * In dark mode the washes stay dark while 500–900 get *lighter*, so a token
-     * keeps its role rather than its hue position. Pair a filled 500 with
-     * `text-surface`, never `text-white` — surface follows the scheme, white
-     * does not, and on dark-mode 500 white leaves a 3:1 glyph.
+     * — but the roles now resolve to two different hues, which is the point.
+     * The accent half (50–600) is blue, so an active control never impersonates
+     * a Ready badge. The text half (700–900) is ink, because a heading is not
+     * an accent and colouring every one of them was most of why the old
+     * dashboard read as monotone green.
      */
-    --brand-50: 145 45% 94%;
-    --brand-100: 145 40% 87%;
-    --brand-500: 152 41% 30%;
-    --brand-600: 154 45% 24%;
-    --brand-700: 156 50% 19%;
-    --brand-900: 158 44% 12%;
+    --brand-50: 214 100% 96%;
+    --brand-100: 214 88% 91%;
+    --brand-500: 214 68% 50%;
+    --brand-600: 214 72% 39%;
+    --brand-700: 160 12% 8%;
+    --brand-900: 160 14% 5%;
 
     /*
-     * The sidebar is a fixed dark-green rail in both schemes — that is the
-     * Figma's design, and it is the one surface that must not follow the
-     * scheme. It has its own tokens because it previously borrowed
-     * `--brand-900`, which dark mode redefines as near-white text; the rail then
-     * rendered white-on-white and the navigation vanished.
-     */
-    --sidebar: 158 44% 12%;
-    --sidebar-foreground: 0 0% 100%;
-
-    --ready: 152 45% 28%;
-    --ready-wash: 145 45% 94%;
-    --moderate: 45 92% 53%;
-    --moderate-wash: 48 90% 95%;
-    --not-ready: 356 75% 57%;
-    --not-ready-wash: 355 80% 96%;
-    --no-data: 150 8% 85%;
-
-    /*
-     * The five-level maturity ramp — Nascent → Optimized, red through green.
+     * The navigation rail. Light now, in both schemes, and separated from the
+     * content by tone plus a hairline rather than by being a dark slab.
      *
-     * A second, finer scale beside the three readiness colours above, for the
-     * places that report a maturity level rather than a readiness band (the
-     * domain score rings and their labels). Ordered as a traffic light, so the
-     * hue moves monotonically and lightness peaks in the middle at yellow: red,
-     * orange, yellow, light green, dark green. Nascent and Optimized sit either
-     * side of the readiness red and green rather than reusing them exactly —
-     * five steps need the extra room at both ends to stay separable, and the two
-     * scales mean different things.
+     * `--sidebar-foreground` is ink rather than white, which keeps every
+     * existing `bg-sidebar-foreground/10` in Sidebar.tsx working: a 10% ink
+     * tint on a light rail is exactly the soft hover wash those rules wanted,
+     * the same way a 10% white tint was on the dark one.
      */
-    --maturity-nascent: 356 74% 50%;
-    --maturity-nascent-wash: 355 80% 96%;
-    --maturity-emerging: 24 88% 51%;
-    --maturity-emerging-wash: 28 90% 95%;
-    --maturity-developing: 45 92% 53%;
-    --maturity-developing-wash: 48 90% 95%;
-    --maturity-institutionalized: 84 54% 40%;
-    --maturity-institutionalized-wash: 86 55% 94%;
-    --maturity-optimized: 152 52% 24%;
-    --maturity-optimized-wash: 145 45% 94%;
+    --sidebar: 90 8% 93%;
+    --sidebar-foreground: 160 12% 8%;
+
+    --ready: 157 79% 26%;
+    --ready-wash: 152 40% 93%;
+    --moderate: 40 90% 44%;
+    --moderate-wash: 42 82% 92%;
+    --not-ready: 7 62% 47%;
+    --not-ready-wash: 8 65% 94%;
+    --no-data: 130 6% 74%;
 
     /*
-     * Administrative boundaries on the maps. Near-solid on purpose: these used
-     * to be drawn as `--foreground` at 30% alpha, which read as a grey wisp
-     * over the readiness fills and vanished entirely over satellite imagery.
-     * Bolder here means higher contrast at the same stroke width — the lines
-     * must not get thicker, or an LGA border starts competing with its own
-     * fill for area on screen.
+     * The score ramp: one hue, light → dark, validated monotone with every
+     * adjacent step clearing ΔL 0.06 and the light end clearing 2:1 against
+     * --surface. Used for score magnitude, choropleth fills, and the five
+     * maturity levels.
      */
-    --map-boundary: 158 50% 10%;
+    --s1: 214 72% 73%;
+    --s2: 214 74% 62%;
+    --s3: 214 68% 50%;
+    --s4: 214 72% 39%;
+    --s5: 214 78% 28%;
 
-    --radius: 0.5rem;
-    --radius-card: 1rem;
+    /*
+     * The five-level maturity ramp — Nascent → Optimized.
+     *
+     * These *are* the score ramp, one step per level, and that is the fix. The
+     * previous ramp was a red→orange→yellow→green traffic light running beside
+     * the three-colour readiness scale, so the page carried two similar-looking
+     * scales meaning different things and taught neither. Maturity is an
+     * ordered scale of the same 1–5 score, so it belongs on the ordinal ramp;
+     * readiness keeps the traffic light to itself.
+     *
+     * The washes stay near-neutral: a maturity level is reported as a labelled
+     * meter, never as a coloured block of text.
+     */
+    --maturity-nascent: 214 72% 73%;
+    --maturity-nascent-wash: 214 60% 96%;
+    --maturity-emerging: 214 74% 62%;
+    --maturity-emerging-wash: 214 60% 95%;
+    --maturity-developing: 214 68% 50%;
+    --maturity-developing-wash: 214 62% 94%;
+    --maturity-institutionalized: 214 72% 39%;
+    --maturity-institutionalized-wash: 214 64% 93%;
+    --maturity-optimized: 214 78% 28%;
+    --maturity-optimized-wash: 214 66% 92%;
+
+    /*
+     * Administrative boundaries on the maps. Drawn in the surface colour rather
+     * than in ink: the fills now carry a sequential ramp, and a dark hairline
+     * between two adjacent dark steps reads as a third, darker step. A
+     * surface-coloured stroke separates polygons by cutting a gap, which stays
+     * legible at every step of the ramp and over satellite imagery alike.
+     */
+    --map-boundary: 80 20% 99%;
+
+    --radius: 0.25rem;
+    --radius-card: 0.25rem;
   }
 
   .dark {
-    --page: 158 30% 8%;
-    --surface: 158 28% 12%;
-    --foreground: 150 20% 96%;
-    --muted: 158 20% 18%;
-    --muted-foreground: 150 10% 65%;
-    --border: 158 20% 20%;
-    --input: 158 20% 20%;
-    --ring: 152 45% 45%;
+    --page: 150 10% 6%;
+    --surface: 156 8% 10%;
+    --surface-sunk: 156 8% 14%;
+    --foreground: 140 12% 94%;
+    --muted: 156 8% 14%;
+    --muted-foreground: 140 6% 68%;
+    --border: 156 7% 17%;
+    --input: 156 7% 22%;
+    --ring: 214 76% 64%;
 
-    --brand-50: 158 28% 16%;
-    --brand-100: 158 26% 22%;
-    --brand-500: 152 42% 52%;
-    --brand-600: 152 45% 62%;
-    --brand-700: 150 40% 74%;
-    --brand-900: 150 20% 96%;
+    --brand-50: 214 44% 14%;
+    --brand-100: 214 42% 20%;
+    --brand-500: 214 76% 64%;
+    --brand-600: 214 72% 73%;
+    --brand-700: 140 12% 94%;
+    --brand-900: 140 14% 97%;
 
-    --sidebar: 158 34% 10%;
-    --sidebar-foreground: 150 20% 96%;
+    --sidebar: 156 8% 14%;
+    --sidebar-foreground: 140 12% 94%;
 
-    --ready: 152 44% 45%;
-    --ready-wash: 152 30% 18%;
-    --moderate: 45 85% 58%;
-    --moderate-wash: 45 30% 18%;
-    --not-ready: 356 70% 62%;
-    --not-ready-wash: 356 30% 19%;
-    --no-data: 158 14% 26%;
+    --ready: 154 54% 40%;
+    --ready-wash: 158 30% 12%;
+    --moderate: 42 76% 52%;
+    --moderate-wash: 40 34% 13%;
+    --not-ready: 8 72% 59%;
+    --not-ready-wash: 8 34% 13%;
+    --no-data: 150 6% 28%;
 
-    /* The ramp, lifted for a dark surface. The order and the hues hold; only
-       lightness moves, and the dark-green end has to come up furthest or
-       Optimized reads as a hole in the ring. */
-    --maturity-nascent: 356 70% 62%;
-    --maturity-nascent-wash: 356 30% 19%;
-    --maturity-emerging: 26 85% 60%;
-    --maturity-emerging-wash: 26 32% 19%;
-    --maturity-developing: 45 85% 58%;
-    --maturity-developing-wash: 45 30% 18%;
-    --maturity-institutionalized: 84 48% 52%;
-    --maturity-institutionalized-wash: 86 26% 18%;
-    --maturity-optimized: 152 44% 42%;
-    --maturity-optimized-wash: 152 30% 18%;
+    /* The ramp, re-stepped for a dark ground rather than inverted: the dark end
+       has to come *up* or it disappears into the surface, so the scale runs
+       dark-blue → pale-blue with the same monotone lightness gaps. */
+    --s1: 214 72% 34%;
+    --s2: 214 70% 44%;
+    --s3: 214 74% 56%;
+    --s4: 214 76% 68%;
+    --s5: 214 80% 84%;
 
-    /* Light, not white: full white at this contrast haloes against the dark
-       fills. Same role, same width, inverted for the scheme. */
-    --map-boundary: 150 25% 92%;
+    --maturity-nascent: 214 72% 34%;
+    --maturity-nascent-wash: 214 40% 15%;
+    --maturity-emerging: 214 70% 44%;
+    --maturity-emerging-wash: 214 40% 16%;
+    --maturity-developing: 214 74% 56%;
+    --maturity-developing-wash: 214 40% 17%;
+    --maturity-institutionalized: 214 76% 68%;
+    --maturity-institutionalized-wash: 214 40% 18%;
+    --maturity-optimized: 214 80% 84%;
+    --maturity-optimized-wash: 214 40% 19%;
+
+    --map-boundary: 156 8% 10%;
   }
 }
 
@@ -176,8 +213,23 @@
 }
 
 @layer components {
+  /* Hierarchy comes from hairlines and vertical rhythm, not from shadow. The
+     one exception is `.sheet` in the report preview, which is standing in for a
+     printed page and is allowed to look like one. */
   .card {
-    @apply bg-surface rounded-card shadow-card border border-border;
+    @apply bg-surface rounded-card border border-border;
+  }
+
+  /* Every label, tick, figure column and code fragment. Prose stays in the
+     sans; readings look like readings. */
+  .mono {
+    font-family: theme('fontFamily.mono');
+    font-variant-numeric: tabular-nums;
+  }
+
+  .eyebrow {
+    font-family: theme('fontFamily.mono');
+    @apply text-[10px] uppercase tracking-[0.13em] text-muted-foreground;
   }
 
   /* Secondary-evidence fill for the 25 desk-review states on the choropleth.
@@ -206,8 +258,7 @@
    * mark taken from --foreground flips to near-white against a background that
    * did not change, and a texture that reads in light mode all but disappears.
    * Only the two mid-toned bands are textured (Ready is solid), so one ink
-   * works on both in both schemes. BandPattern.tsx and bandDecal() in
-   * chartTheme.ts make the same choice for the same reason.
+   * works on both in both schemes.
    *
    * Scaled small enough to survive inside a 6px distribution bar, which is the
    * tightest place any of these has to work.

@@ -105,12 +105,14 @@ the deploy preview:
 
 ## Known advisories
 
-`npm audit` reports one moderate issue against production dependencies as of
-this commit. It is not a deploy blocker; it is recorded here so the choice is
-deliberate rather than forgotten:
+`npm audit` reports no outstanding issues against production dependencies as of
+this commit.
 
-- **`echarts` <6.1.0** — XSS. The fix is a major version bump. The charts
-  render ETL-generated data, not user input.
+**Resolved:** the **`echarts` <6.1.0** XSS advisory, by removing `echarts` and
+`echarts-for-react` outright. The redesign replaced every chart with the DOM
+meters in `src/components/ui/Meter.tsx`, leaving the dependency reachable by
+nothing — so the fix was a deletion rather than the major version bump the
+advisory called for.
 
 **Resolved:** the `react-router` advisories (open redirect via backslash in
 `<Link>`/`useNavigate`, GHSA-wrjc-x8rr-h8h6; plus an SSR-hydration issue that
@@ -136,6 +138,6 @@ Note that react-router 7 declares `engines.node >= 20`, so the `NODE_VERSION`
 pin in `netlify.toml` is now a hard floor rather than a preference.
 
 Deliberately not configured: a `Content-Security-Policy`. The PDF and image
-export path (`jspdf`, `html2canvas`) and ECharts rely on inline styles, so a
-policy strict enough to be worth adding needs to be developed against those
-export flows rather than bolted on at deploy time.
+export path (`jspdf`, `html2canvas`) relies on inline styles, so a policy strict
+enough to be worth adding needs to be developed against those export flows
+rather than bolted on at deploy time.

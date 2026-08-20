@@ -112,17 +112,20 @@ export const BAND_CLASSES: Record<
 // either. `BandBadge` has always paired the colour with an icon and a label.
 // These three tables extend that pattern to the surfaces where no label fits.
 //
-// One shape vocabulary, three renderings, because the media genuinely differ:
+// One shape vocabulary, two renderings, because the media genuinely differ:
 //
 //   BAND_TEXTURE   area fills — CSS classes for HTML, `<pattern>` for SVG
 //                  (`components/map/BandPattern.tsx`)
 //   BAND_MARKER    point marks, where a texture inside a 6px dot is invisible
 //                  and the shape of the dot is the thing that reads
-//   BAND_DECAL     canvas — ECharts cannot use either of the above
-//                  (`components/charts/chartTheme.ts`)
 //
-// Keep them saying the same thing. A reader who learns "dots mean moderate" on
-// the map must not meet a different dots on the donut beside it.
+// There was a third, BAND_DECAL, for the ECharts canvas, which could use
+// neither of the above. The charts it served were replaced by the meters and
+// tracks in `components/ui/Meter.tsx`, which are plain DOM and take the CSS
+// classes directly, so ECharts and the decal table left together.
+//
+// Keep the two saying the same thing. A reader who learns "dots mean moderate"
+// on the map must not meet a different dots on the panel beside it.
 //
 // Ready is deliberately the untextured one. It is the band that should read as
 // solid and complete, and leaving the best case clean keeps the texture from
@@ -152,7 +155,7 @@ export const BAND_TEXTURE_LABEL: Record<BandTexture, string> = {
   stripes: 'striped',
 };
 
-/** CSS custom-property name per band, for SVG/ECharts that cannot use classes. */
+/** CSS custom-property name per band, for SVG that cannot use classes. */
 export const BAND_CSS_VAR: Record<Band, string> = {
   not_ready: '--not-ready',
   moderately_ready: '--moderate',

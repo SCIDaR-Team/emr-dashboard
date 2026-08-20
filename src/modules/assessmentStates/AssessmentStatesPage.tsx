@@ -1,26 +1,45 @@
-import { Building2, CheckCircle2, CircleSlash, MinusCircle, MapPin } from 'lucide-react';
+import { useMemo } from 'react';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { KpiTile, MaturityBadge, SectionCard, EmptyState, LoadError, Skeleton } from '@/components/ui';
+import {
+  BandLegend,
+  EmptyState,
+  LoadError,
+  ScoreAxis,
+  ScoreRow,
+  SectionCard,
+  Skeleton,
+  Tile,
+  TileRow,
+} from '@/components/ui';
 import { FilterBar } from '@/components/filters/FilterBar';
-import { ArchetypeDonut } from '@/components/charts';
-import { InvestmentTable } from '@/components/scorecard';
-import { RankedStateTable } from './RankedStateTable';
+import { RankedLgaTable } from './RankedLgaTable';
 import { useDataContext } from '@/state/dataContext';
 import { useFilterStore } from '@/store/filterStore';
 import { useFilteredData } from '@/hooks/useFilteredData';
-import { aggregateAreaProfiles } from '@/lib/areaProfile';
-import { BAND_ACTION, BAND_DESCRIPTION, BAND_LABEL } from '@/lib/bands';
+import { BAND_ACTION, BAND_CLASSES, BAND_LABEL } from '@/lib/bands';
+import { cn } from '@/lib/cn';
 import { COVERAGE } from '@/lib/constants';
 import { formatCount, formatScore, percentOf } from '@/lib/format';
+import { THEMES } from '@/lib/themes';
+import type { Band } from '@/lib/types';
+
+const BAND_ORDER: Band[] = ['ready', 'moderately_ready', 'not_ready'];
 
 /**
- * Module 3 — Assessment States.
+ * Module 3 — Assessed States.
  *
- * The 12 primary states: coverage funnel, archetype split, per-state KPIs and
- * the itemised investment table.
+ * The 12 states with primary facility data, down to LGA.
  *
- * This module is fully computable from `ERA dataset_v4.xlsx` — only the
- * investment table waits on a cost table.
+ * Two things went from the previous version. The archetype donut, because its
+ * three slices carried exactly the same three numbers as the three cards
+ * printed beside it — two encodings of one fact, and the more expensive one
+ * was the less readable. And the itemised investment table, which now lives on
+ * the Investment Plan page where a budget is actually built.
+ *
+ * What replaced them is the thing this module was missing: the domain scores
+ * for the scope in view, and an LGA ranking. A page about 12 states that never
+ * showed the 305 LGAs underneath them was stopping one level short of where
+ * the decisions get made.
  */
 export default function AssessmentStatesPage() {
   const { facilities, allFacilities, metrics, isLoading, isFiltered, error, retry } =
@@ -28,50 +47,40 @@ export default function AssessmentStatesPage() {
   const { states, national } = useDataContext();
   const selectedStates = useFilterStore((s) => s.states);
 
-  // The itemised investment table reflects the selected state(s) — one,
-  // several, or (no selection) all 12 assessed states, aggregated for
-  // anything other than exactly one so picking two states does not silently
-  // fall back to the national total. It does not follow every filter
-  // combination (LGA, functionality, archetype) — those would need a
-  // client-side rollup over per-facility investment items, which the lean
-  // facility summary deliberately does not carry (guide §11's payload
-  // budget). Labelled below rather than silently narrowed.
-  const selectedStateProfiles = selectedStates.length
-    ? states.data.filter((s) => selectedStates.includes(s.name))
-    : [];
-  const singleState = selectedStateProfiles.length === 1 ? selectedStateProfiles[0] : null;
-  const investmentScope =
-    selectedStateProfiles.length === 0
-      ? national.data
-      : selectedStateProfiles.length === 1
-        ? singleState
-        : aggregateAreaProfiles(selectedStateProfiles);
-  const investmentItems = investmentScope?.investments ?? [];
-  const investmentScopeLabel =
-    selectedStateProfiles.length === 0
-      ? null
-      : selectedStateProfiles.length === 1
-        ? (singleState?.name ?? null)
-        : `${selectedStateProfiles.length} selected states`;
+  const scopeLabel =
+    selectedStates.length === 0
+      ? `All ${COVERAGE.statesPrimary} assessed states`
+      : selectedStates.length === 1
+        ? selectedStates[0]
+        : `${selectedStates.length} selected states`;
 
-  // Four different situations that used to reach the reader as one message.
-  //   loaded            — render the page
-  //   still arriving    — a skeleton, never a frame full of zeros
-  //   failed            — say so, offer a retry, and do not call it "no data"
-  //   loaded but empty  — the only one that is a finding, and it is about the
-  //                       build rather than the assessment
-  // `hasData` deliberately survives an error: useFetchJSON keeps the last good
-  // value on failure so a transient blip does not blank a page someone is
-  // reading, and throwing that away here would undo it. When both are true the
-  // error rides above the figures as a staleness warning instead of replacing
-  // them.
+  /** Leadership is state-scored, so it has no facility-level average to take
+   *  from `metrics`. Read it from the state profiles actually in scope. */
+  const leadership = useMemo(() => {
+    const inScope = states.data.filter(
+      (s) =>
+        s.evidenceGrade === 'primary' &&
+        (selectedStates.length === 0 || selectedStates.includes(s.name)),
+    );
+    const values = inScope
+      .map((s) => s.themeScores.leadership_governance)
+      .filter((v): v is number => v != null);
+    return values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
+  }, [states.data, selectedStates]);
+
+  const nationalMean = national.data?.averageScore ?? null;
+  const lgaCount = useMemo(
+    () => new Set(facilities.map((f) => `${f.stateId}.${f.lgaId}`)).size,
+    [facilities],
+  );
+
   const hasData = allFacilities.length > 0;
 
   return (
     <>
       <PageHeader
-        title="Assessment States"
-        subtitle={`Readiness across the ${COVERAGE.statesPrimary} physically visited states`}
+        title="Assessed States"
+        subtitle={`The ${COVERAGE.statesPrimary} states visited, down to LGA`}
       >
         <FilterBar
           facilities={allFacilities}
@@ -79,20 +88,12 @@ export default function AssessmentStatesPage() {
         />
       </PageHeader>
 
-      <div className="space-y-5 px-4 pb-8 sm:px-6 lg:space-y-6 lg:px-8">
-        {error && (
-          <LoadError
-            what="the facility summary"
-            error={error}
-            onRetry={retry}
-          />
-        )}
+      <div className="space-y-4 p-4 sm:p-5">
+        {error && <LoadError what="the facility summary" error={error} onRetry={retry} />}
 
         {isLoading && !hasData ? (
           <AssessmentSkeleton />
         ) : !hasData ? (
-          // Only reachable when the fetch succeeded and returned nothing, which
-          // really is a missing build rather than a missing network.
           !error && (
             <EmptyState
               title="No facility data in this build"
@@ -101,140 +102,124 @@ export default function AssessmentStatesPage() {
           )
         ) : (
           <>
-        {isFiltered && (
-          <p className="rounded-lg bg-moderate-wash px-4 py-2 text-sm text-foreground/80">
-            Filters are active — every figure below reflects{' '}
-            {formatCount(metrics.total)} of {formatCount(COVERAGE.facilitiesScored)}{' '}
-            facilities.
-          </p>
-        )}
+            <TileRow className="sm:grid-cols-2 xl:grid-cols-4">
+              <Tile
+                label="Scope"
+                value={<span className="text-[19px]">{scopeLabel}</span>}
+                note={`${formatCount(metrics.total)} facilities · ${formatCount(lgaCount)} LGAs`}
+              />
+              {BAND_ORDER.map((band) => (
+                <Tile
+                  key={band}
+                  band={band}
+                  label={BAND_LABEL[band]}
+                  value={formatCount(metrics.distribution[band])}
+                  suffix={percentOf(metrics.distribution[band], metrics.total, 1)}
+                  note={BAND_ACTION[band]}
+                />
+              ))}
+            </TileRow>
 
-        {/* Coverage funnel */}
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <KpiTile
-            label="States covered"
-            value={COVERAGE.statesPrimary}
-            icon={<MapPin className="h-6 w-6" aria-hidden />}
-          />
-          <KpiTile
-            label="Facilities covered"
-            value={isLoading ? '—' : formatCount(metrics.total)}
-            sublabel={`of ${formatCount(COVERAGE.facilitiesSampled)} sampled`}
-            icon={<Building2 className="h-6 w-6" aria-hidden />}
-          />
-          <KpiTile
-            label={singleState ? `${singleState.name} score` : 'Average domain score'}
-            value={
-              <span className="flex flex-col gap-1">
-                <span>{formatScore(metrics.averageScore)}/5</span>
-                <MaturityBadge score={metrics.averageScore} size="sm" className="w-fit" />
-              </span>
-            }
-            icon={<CheckCircle2 className="h-6 w-6" aria-hidden />}
-          />
-          <KpiTile
-            label="Composite readiness"
-            value={formatScore(metrics.compositeReadiness, 2)}
-            sublabel="(5·ready + 3·moderate + 1·not ready) ÷ total"
-            icon={<MinusCircle className="h-6 w-6" aria-hidden />}
-          />
-        </div>
+            {isFiltered && (
+              <p className="mono border border-moderate bg-moderate-wash px-3.5 py-2 text-[11px] text-foreground">
+                Filters are active — every figure below reflects{' '}
+                {formatCount(metrics.total)} of {formatCount(COVERAGE.facilitiesScored)}{' '}
+                facilities.
+              </p>
+            )}
 
-        {/* Archetype split — the donut is the headline; the row beside it
-            names the action each band implies, which is the point of the
-            classification and should not live only in a legend key. */}
-        <SectionCard
-          title="Facility archetype split"
-          subtitle="Every facility below falls into exactly one of these three"
-        >
-          <div className="flex flex-wrap items-center gap-8">
-            <ArchetypeDonut
-              distribution={metrics.distribution}
-              // The three cards beside the ring already name every band with its
-              // count and share, so the ring's own dot legend would say it twice.
-              // Its arcs carry the figures outside them either way.
-              showLegend={false}
-              className="w-full max-w-[340px] shrink-0 sm:w-auto sm:flex-1"
-              ariaLabel={`Archetype split: ${formatCount(metrics.distribution.ready)} ready, ${formatCount(metrics.distribution.moderately_ready)} moderately ready, ${formatCount(metrics.distribution.not_ready)} not ready`}
-            />
-            <div className="grid flex-1 gap-3 sm:grid-cols-3">
-              {(['ready', 'moderately_ready', 'not_ready'] as const).map((band) => {
-                const count = metrics.distribution[band];
-                const Icon =
-                  band === 'ready'
-                    ? CheckCircle2
-                    : band === 'moderately_ready'
-                      ? MinusCircle
-                      : CircleSlash;
-                return (
-                  <div key={band} className="rounded-lg border border-border p-4">
-                    <div className="flex items-center gap-2">
-                      <Icon className="h-4 w-4 text-brand-600" aria-hidden />
-                      <p className="text-sm font-medium">{BAND_LABEL[band]}</p>
-                    </div>
-                    <p className="mt-2 text-2xl font-bold text-brand-700">{formatCount(count)}</p>
-                    <p className="text-xs text-muted-foreground">{BAND_DESCRIPTION[band]}</p>
-                    <p className="mt-1 text-xs font-medium text-brand-600">
-                      {percentOf(count, metrics.total)} · {BAND_ACTION[band]}
-                    </p>
-                  </div>
-                );
-              })}
+            <div className="grid items-start gap-4 xl:grid-cols-2">
+              <SectionCard title="Domain scores" subtitle={scopeLabel}>
+                <div className="space-y-2.5">
+                  {THEMES.map((theme) => (
+                    <ScoreRow
+                      key={theme.id}
+                      label={theme.label}
+                      value={
+                        theme.facilityLevel
+                          ? metrics.themeAverages[
+                              theme.id as keyof typeof metrics.themeAverages
+                            ]
+                          : leadership
+                      }
+                      reference={nationalMean}
+                      maturity
+                    />
+                  ))}
+                </div>
+                <ScoreAxis reference={nationalMean} />
+                <p className="mono mt-3 text-[10.5px] leading-relaxed text-muted-foreground">
+                  Leadership &amp; Governance is scored once per state, so it does not vary
+                  with an LGA or facility filter — it is the mean across the states in scope.
+                </p>
+              </SectionCard>
+
+              <SectionCard
+                title="How the facilities split"
+                subtitle="every facility falls in exactly one band"
+              >
+                <div className="space-y-2.5">
+                  {BAND_ORDER.map((band) => {
+                    const n = metrics.distribution[band];
+                    const pct = metrics.total ? (n / metrics.total) * 100 : 0;
+                    return (
+                      <div key={band}>
+                        <div className="mb-1 flex items-baseline justify-between gap-3 text-[12.5px] text-muted-foreground">
+                          <span>{BAND_LABEL[band]}</span>
+                          <span className="mono font-semibold text-foreground">
+                            {formatCount(n)} · {pct.toFixed(1)}%
+                          </span>
+                        </div>
+                        <div className="h-[7px] rounded-[1px] bg-surface-sunk">
+                          <span
+                            className={cn(
+                              'block h-full rounded-r-[3px]',
+                              BAND_CLASSES[band].bg,
+                              BAND_CLASSES[band].texture,
+                            )}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-4 border-l-2 border-brand-500 pl-4">
+                  <p className="mono mb-1 text-[10px] uppercase tracking-[0.12em] text-brand-500">
+                    What the split means
+                  </p>
+                  <p className="text-[13px] text-muted-foreground">
+                    The two lower bands are not the same problem.{' '}
+                    <strong className="font-semibold text-foreground">Moderately ready</strong>{' '}
+                    facilities need targeted fixes against named minimum requirements;{' '}
+                    <strong className="font-semibold text-foreground">Not ready</strong>{' '}
+                    facilities are blocked by a core domain and need foundational build
+                    first — no amount of training moves them.
+                  </p>
+                </div>
+              </SectionCard>
             </div>
-          </div>
-        </SectionCard>
 
-        <SectionCard
-          title="Readiness by state"
-          subtitle="Facilities assessed and archetype split per state — switch between table and bar views; click a row or bar to scope the page"
-        >
-          {facilities.length === 0 ? (
-            // Distinct from the page-level empty state above: the data loaded
-            // fine, the filters just exclude everything. Telling someone to
-            // rebuild the ETL because they picked Rivers + Functional L2 sends
-            // them a very long way from the Reset button they need.
-            <EmptyState
-              title="No facilities match the current filters"
-              message="Widen or clear a filter above to bring facilities back into scope."
-            />
-          ) : (
-            <RankedStateTable
-              facilities={facilities}
-              scopeNotes={[
-                [
-                  'Population',
-                  isFiltered
-                    ? `Filtered — ${formatCount(metrics.total)} of ${formatCount(COVERAGE.facilitiesScored)} assessed facilities match the active filters.`
-                    : `All ${formatCount(metrics.total)} assessed facilities across the ${COVERAGE.statesPrimary} physically visited states.`,
-                ],
-              ]}
-            />
-          )}
-        </SectionCard>
+            {facilities.length > 0 && (
+              <SectionCard
+                title="LGAs ranked"
+                subtitle={`${formatCount(lgaCount)} LGAs in scope · by average domain score`}
+                action={<BandLegend />}
+                bodyClassName="p-0"
+              >
+                <RankedLgaTable facilities={facilities} />
+              </SectionCard>
+            )}
 
-        <SectionCard
-          title="Total investments required"
-          subtitle={
-            investmentScopeLabel
-              ? `Itemised across ${investmentScopeLabel} — ${formatCount(
-                  selectedStateProfiles.reduce((sum, s) => sum + s.facilityCount, 0),
-                )} assessed facilities`
-              : `Itemised across all ${formatCount(COVERAGE.statesPrimary)} assessed states`
-          }
-        >
-          {investmentItems.length ? (
-            <InvestmentTable items={investmentItems} />
-          ) : (
-            <EmptyState
-              title={investmentScope ? 'No investment needed' : 'Loading…'}
-              message={
-                investmentScope
-                  ? 'Every measured minimum requirement across this population is met.'
-                  : undefined
-              }
-            />
-          )}
-        </SectionCard>
+            <p className="mono text-[10.5px] text-muted-foreground">
+              Investment for this scope is itemised and costed on the{' '}
+              <a href="/investment" className="text-brand-500 hover:text-brand-600">
+                Investment Plan
+              </a>{' '}
+              page. Average domain score {formatScore(metrics.averageScore, 2)} · composite
+              readiness {formatScore(metrics.compositeReadiness, 2)}.
+            </p>
           </>
         )}
       </div>
@@ -246,21 +231,18 @@ export default function AssessmentStatesPage() {
  * The page's own shape while the facility summary is in flight.
  *
  * `PageSkeleton` is the route-level fallback and does not fit here — the header
- * and filter bar have already rendered from constants, so a second set of title
- * bars underneath them would be wrong. What this replaces is worse than
- * nothing: the KPI tiles rendered `—`, the donut fell to its grey "No data"
- * ring, and the three band cards each showed `0`, which reads as a finding that
- * no facility in Nigeria is ready.
+ * and filter bar have already rendered from constants. What this replaces is
+ * worse than nothing: the tiles rendered `—` and the band figures each showed
+ * `0`, which reads as a finding that no facility in Nigeria is ready.
  */
 function AssessmentSkeleton() {
   return (
-    <div role="status" aria-label="Loading assessment figures" className="space-y-5 lg:space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {Array.from({ length: 4 }, (_, i) => (
-          <Skeleton key={i} className="h-24" />
-        ))}
+    <div role="status" aria-label="Loading assessment figures" className="space-y-4">
+      <Skeleton className="h-24" />
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Skeleton className="h-64" />
+        <Skeleton className="h-64" />
       </div>
-      <Skeleton className="h-64" />
       <Skeleton className="h-96" />
       <span className="sr-only">Loading…</span>
     </div>

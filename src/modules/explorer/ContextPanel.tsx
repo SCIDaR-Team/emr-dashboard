@@ -1,6 +1,6 @@
 import { ExternalLink, Info, TriangleAlert } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { BandBadge, BandIcon, Skeleton } from '@/components/ui';
+import { BandBadge, BandIcon, MaturityMeter, Skeleton } from '@/components/ui';
 import { useDataContext } from '@/state/dataContext';
 import { cn } from '@/lib/cn';
 import { BAND_ACTION, BAND_CLASSES, BAND_LABEL } from '@/lib/bands';
@@ -111,6 +111,15 @@ export function ContextPanel({
               <div className="mt-1">
                 <BandBadge band={cell.band} />
               </div>
+              {/* Only when the headline is a 1–5 score. Under the "% ready"
+                  aggregation there is no score on screen to place on the
+                  maturity ramp, and placing the percentage there would be a
+                  different scale wearing the same five steps. */}
+              {!showsPercent && (
+                <div className="mt-2">
+                  <MaturityMeter score={headlineValue} size="lg" />
+                </div>
+              )}
             </div>
             <Figure
               label={isFacility ? 'Facility' : 'Facilities assessed'}

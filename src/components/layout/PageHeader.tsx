@@ -6,55 +6,93 @@ import { cn } from '@/lib/cn';
 interface PageHeaderProps {
   title: string;
   subtitle?: string;
-  /** Filter controls, rendered directly beneath the title. */
+  /** Filter controls. Rendered as their own hairline-separated row beneath the
+   *  title bar, so the title row keeps a fixed height on every page. */
   children?: React.ReactNode;
+  /** Actions that sit at the right of the title row — export menus, mode
+   *  toggles. The next-module arrow is appended after them. */
+  actions?: React.ReactNode;
   className?: string;
 }
 
 /**
- * Page title, optional filter row, and the circular next-module arrow.
+ * The page's title bar and filter row.
  *
- * The arrow gives a linear walkthrough alongside sidebar navigation — these
- * stakeholders present from this dashboard, and a predictable "next" is worth
- * keeping from the prototype.
+ * One line, ~52px, sentence case. The previous header set the title in
+ * uppercase at `text-3xl` over a subtitle and a filter block, which spent about
+ * 180px of a 900px viewport before any data appeared — and shouted, on a page
+ * whose job is to be read. The title and its one-line description now share a
+ * single baseline row, and filters get their own band below.
  */
-export function PageHeader({ title, subtitle, children, className }: PageHeaderProps) {
+export function PageHeader({
+  title,
+  subtitle,
+  children,
+  actions,
+  className,
+}: PageHeaderProps) {
   const { pathname } = useLocation();
   const next = nextModule(pathname);
 
   return (
-    <header className={cn('px-4 pb-4 pt-6 sm:px-6 lg:px-8 lg:pt-8', className)}>
-      <div className="flex items-start justify-between gap-6">
-        <div className="min-w-0">
-          {/* The uppercase display size is from the Figma, which has no mobile
-              design at all. At 375px "DRILL-DOWN EXPLORER" at 3xl wraps to
-              three lines and pushes the controls below the fold, so the step
-              down is a real one rather than a token. */}
-          <h1 className="text-xl font-bold uppercase tracking-tight text-brand-700 sm:text-2xl lg:text-3xl">
+    // Sticky, not fixed: `main` in AppShell is the scroll container, so the
+    // header pins to the top of the content column and keeps the rail's own
+    // scroll behaviour untouched. z-30 clears the panels and tables that scroll
+    // beneath it but stays under the drawer/toast layer at z-90+.
+    <header className={cn('sticky top-0 z-30 shrink-0', className)}>
+      <div className="flex min-h-[52px] items-center gap-4 border-b border-border bg-surface px-4 sm:px-5">
+        <div className="flex min-w-0 items-baseline gap-3">
+          <h1 className="shrink-0 text-base font-semibold tracking-tight text-foreground">
             {title}
           </h1>
           {subtitle && (
-            <p className="mt-1.5 max-w-3xl text-sm text-muted-foreground">{subtitle}</p>
+            <p className="min-w-0 truncate text-xs text-muted-foreground">{subtitle}</p>
           )}
         </div>
 
-        {next && (
-          // Hidden on small screens: it is a convenience for presenting from
-          // the dashboard in sequence, and on a phone it competes for the top
-          // corner with the navigation button that is not optional.
-          <Link
-            to={next}
-            aria-label="Next module"
-            className="hidden h-10 w-10 shrink-0 place-items-center rounded-full border border-border bg-surface text-brand-600 transition-colors hover:bg-brand-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring sm:grid"
-          >
-            <ArrowRight className="h-5 w-5" aria-hidden />
-          </Link>
-        )}
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          {actions}
+          {next && (
+            // A predictable "next" is worth keeping from the prototype — these
+            // stakeholders present from the dashboard in sequence. Hidden on
+            // small screens, where the top corner is already spoken for by the
+            // navigation button.
+            <Link
+              to={next}
+              aria-label="Next module"
+              className="hidden h-8 w-8 place-items-center rounded border border-input text-muted-foreground transition-colors hover:border-muted-foreground hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring sm:grid"
+            >
+              <ArrowRight className="h-4 w-4" aria-hidden />
+            </Link>
+          )}
+        </div>
       </div>
 
       {children && (
-        <div className="mt-5 flex flex-wrap items-end gap-3 sm:mt-6 sm:gap-4">{children}</div>
+        <div className="flex flex-wrap items-center gap-2 border-b border-border bg-surface px-4 py-2 sm:px-5">
+          {children}
+        </div>
       )}
     </header>
+  );
+}
+
+/** The label + control pairing used inside the filter row. */
+export function Field({
+  label,
+  children,
+  className,
+}: {
+  label: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn('flex items-center gap-2', className)}>
+      <span className="mono shrink-0 text-[9.5px] uppercase tracking-[0.11em] text-muted-foreground">
+        {label}
+      </span>
+      {children}
+    </div>
   );
 }
