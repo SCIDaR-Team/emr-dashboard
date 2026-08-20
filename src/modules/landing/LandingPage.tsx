@@ -16,15 +16,15 @@ import { BAND_ACTION, BAND_CLASSES, BAND_LABEL } from '@/lib/bands';
 import { cn } from '@/lib/cn';
 import { COVERAGE, VALIDATION_TARGETS } from '@/lib/constants';
 import { formatCount, formatScore } from '@/lib/format';
-import { SUB_THEMES } from '@/lib/themes';
-import type { Band } from '@/lib/types';
+import { FACILITY_THEMES } from '@/lib/themes';
+import type { Band, ThemeId } from '@/lib/types';
 
 /**
  * Landing page — the front door, at `/`.
  *
  * Sits outside the AppShell: no navigation rail, no filter bar. The hero and
  * the coverage figures come from `constants.ts` so the page paints immediately
- * while DataProvider warms the datasets behind it; the two sub-theme extremes
+ * while DataProvider warms the datasets behind it; the two domain extremes
  * fill in when the national profile lands, and are simply absent until then.
  *
  * The page leads with the finding rather than the programme name. "EMR
@@ -50,6 +50,18 @@ const ICONS: Record<string, LucideIcon> = {
 
 /** Best case first — the waffle reads top-left to bottom-right. */
 const BAND_ORDER: readonly Band[] = ['ready', 'moderately_ready', 'not_ready'] as const;
+
+/**
+ * One line of plain reading per domain. Keyed rather than written into the two
+ * cards, so the note stays true to whichever domain lands at either end.
+ */
+const DOMAIN_NOTE: Record<ThemeId, string> = {
+  technical_infrastructure: 'Power, connectivity and backup — the binding constraint on rollout.',
+  workforce_capacity: 'Staff already handle the devices an electronic record would run on.',
+  workflow_transition: 'Paper routines sit close enough to the target workflow to shift.',
+  data_use_reporting: 'Facilities already review and act on the data they collect.',
+  leadership_governance: 'State-level desk review only; no facility instrument behind it.',
+};
 
 const ARCHETYPES = VALIDATION_TARGETS.archetypeCounts;
 const SCORED_TOTAL = ARCHETYPES.ready + ARCHETYPES.moderately_ready + ARCHETYPES.not_ready;
@@ -86,13 +98,23 @@ export default function LandingPage() {
   const { national, lgas } = useDataContext();
   const profile = national.data;
 
-  /** The two ends of the instrument — the finding, in two numbers. */
+  /**
+   * The two ends of the instrument — the finding, in two numbers.
+   *
+   * Domains, not sub-domains: a reader meets the instrument at the domain
+   * level, and the five domains are what every other page is organised by.
+   * Leadership & Governance is left out because it has no facility instrument
+   * — it is desk-reviewed at state level, and setting it against four
+   * facility-scored domains would compare two grades of evidence.
+   */
   const extremes = useMemo(() => {
     if (!profile) return null;
-    const scored = SUB_THEMES.map((def) => ({
+    const scored = FACILITY_THEMES.map((def) => ({
       def,
-      value: profile.subThemeScores[def.id] ?? null,
-    })).filter((s): s is { def: (typeof SUB_THEMES)[number]; value: number } => s.value != null);
+      value: profile.themeScores[def.id] ?? null,
+    })).filter(
+      (s): s is { def: (typeof FACILITY_THEMES)[number]; value: number } => s.value != null,
+    );
     if (scored.length < 2) return null;
     const sorted = [...scored].sort((a, b) => b.value - a.value);
     return { best: sorted[0]!, worst: sorted[sorted.length - 1]! };
@@ -184,10 +206,12 @@ export default function LandingPage() {
         {/* ── Coverage ───────────────────────────────────────────────── */}
         <div className="mt-12 grid gap-px border border-border bg-border sm:grid-cols-2 lg:grid-cols-4">
           {[
+            // Widest scope first, narrowing left to right: the whole country,
+            // the part of it visited, and then what that visit covered.
             [String(COVERAGE.statesTotal), 'States & FCT'],
+            [String(COVERAGE.statesPrimary), 'States visited'],
             [formatCount(lgaCount), 'LGAs covered'],
             [formatCount(COVERAGE.facilitiesScored), 'Facilities assessed'],
-            [String(COVERAGE.statesPrimary), 'States visited'],
           ].map(([value, label]) => (
             <div key={label} className="bg-surface px-4 py-3.5">
               <p className="mono text-[25px] font-semibold leading-none tracking-tight text-foreground">
@@ -199,35 +223,6 @@ export default function LandingPage() {
             </div>
           ))}
         </div>
-
-        {/* ── The two ends of the instrument ─────────────────────────── */}
-        {extremes && (
-          <div className="mt-4 grid gap-4 md:grid-cols-2">
-            {[
-              { key: 'best', label: 'Strongest sub-theme', entry: extremes.best,
-                note: 'Staff expect and accept the move to digital records.' },
-              { key: 'worst', label: 'Weakest sub-theme', entry: extremes.worst,
-                note: 'Almost no facility has a fallback when the primary link drops.' },
-            ].map(({ key, label, entry, note }) => (
-              <div key={key} className="card p-4">
-                <p className="eyebrow">{label}</p>
-                <p className="mono mt-1.5 text-[28px] font-semibold leading-none tracking-tight text-foreground">
-                  {formatScore(entry.value, 2)}
-                  <span className="ml-1 text-[13px] font-medium tracking-normal text-muted-foreground">
-                    /5
-                  </span>
-                </p>
-                <p className="mt-2 text-sm font-semibold text-foreground">
-                  {entry.def.shortLabel}
-                </p>
-                <p className="mt-1 text-[13px] text-muted-foreground">{note}</p>
-                <div className="mt-3">
-                  <MaturityMeter score={entry.value} />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
       </section>
 
       {/* ── What the three bands mean ──────────────────────────────────── */}
@@ -271,6 +266,47 @@ export default function LandingPage() {
               );
             })}
           </div>
+
+          {/* The two ends of that scale. Below the bands, not above them: each
+              card is a position on the scale, and means little without it. */}
+          {extremes && (
+            <>
+              <h3 className="mt-10 text-xl font-semibold tracking-tight text-foreground">
+                The strongest and the weakest domain
+              </h3>
+              <p className="mt-2 max-w-[68ch] text-[13px] text-muted-foreground">
+                Of the four domains scored at facility level. Leadership &amp; Governance is
+                held out — it is evidenced by state-level desk review, not by the facility
+                instrument.
+              </p>
+
+              <div className="mt-5 grid gap-4 md:grid-cols-2">
+                {[
+                  { key: 'best', label: 'Strongest domain', entry: extremes.best },
+                  { key: 'worst', label: 'Weakest domain', entry: extremes.worst },
+                ].map(({ key, label, entry }) => (
+                  <div key={key} className="card p-4">
+                    <p className="eyebrow">{label}</p>
+                    <p className="mono mt-1.5 text-[28px] font-semibold leading-none tracking-tight text-foreground">
+                      {formatScore(entry.value, 2)}
+                      <span className="ml-1 text-[13px] font-medium tracking-normal text-muted-foreground">
+                        /5
+                      </span>
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-foreground">
+                      {entry.def.label}
+                    </p>
+                    <p className="mt-1 text-[13px] text-muted-foreground">
+                      {DOMAIN_NOTE[entry.def.id]}
+                    </p>
+                    <div className="mt-3">
+                      <MaturityMeter score={entry.value} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </section>
 
